@@ -340,7 +340,7 @@
 
         // Segmentation Quality Constants
         const MASK_BLUR_PX = 3; // Blur radius for soft edges
-        const MASK_SMOOTHING_ALPHA = 0.35; // 0.0 - 1.0 (Lower = more smoothing/lag, Higher = faster/jittery)
+        const MASK_SMOOTHING_ALPHA = 0.75; // Increased to reduce ghosting (was 0.35)
 
         // Offscreen canvas for temporal smoothing
         const smoothCanvas = document.createElement('canvas');
