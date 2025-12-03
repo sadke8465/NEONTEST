@@ -387,28 +387,43 @@
         //  === SEGMENTATION CONFIGURATION ===
         // =========================================================
         const MASK_BLUR_PX = 3;
-        const MASK_SMOOTHING_ALPHA = 0.35; // 0.0 - 1.0 (Lower = more smoothing, Higher = faster response)
+        const MASK_SMOOTHING_ALPHA = 0.35; // New frame weight
 
-        // Offscreen canvas for temporal smoothing
+        // Offscreen canvases for temporal smoothing
         const smoothedMaskCanvas = document.createElement('canvas');
         const smoothedMaskCtx = smoothedMaskCanvas.getContext('2d');
+        const tempMaskCanvas = document.createElement('canvas');
+        const tempMaskCtx = tempMaskCanvas.getContext('2d');
 
         function onResults(results) {
-            // 1. Prepare Smoothing Canvas
+            // 1. Prepare Canvases
             if (smoothedMaskCanvas.width !== results.image.width || smoothedMaskCanvas.height !== results.image.height) {
                 smoothedMaskCanvas.width = results.image.width;
                 smoothedMaskCanvas.height = results.image.height;
+                tempMaskCanvas.width = results.image.width;
+                tempMaskCanvas.height = results.image.height;
             }
 
-            // 2. Temporal Smoothing: Blend new mask with previous frame
-            // Draw the new mask with low opacity to blend it with what's already there
-            smoothedMaskCtx.globalCompositeOperation = 'source-over';
-            smoothedMaskCtx.globalAlpha = MASK_SMOOTHING_ALPHA;
-            smoothedMaskCtx.drawImage(results.segmentationMask, 0, 0, results.image.width, results.image.height);
+            // 2. Temporal Smoothing (Additive Blending)
+            // Goal: Result = (Old * (1 - Alpha)) + (New * Alpha)
 
-            // Restore alpha for next operations
+            // Clear temp canvas
+            tempMaskCtx.clearRect(0, 0, tempMaskCanvas.width, tempMaskCanvas.height);
+
+            // Draw Old * (1 - Alpha)
+            tempMaskCtx.globalCompositeOperation = 'source-over';
+            tempMaskCtx.globalAlpha = 1.0 - MASK_SMOOTHING_ALPHA;
+            tempMaskCtx.drawImage(smoothedMaskCanvas, 0, 0);
+
+            // Draw New * Alpha (Additively)
+            tempMaskCtx.globalCompositeOperation = 'lighter';
+            tempMaskCtx.globalAlpha = MASK_SMOOTHING_ALPHA;
+            tempMaskCtx.drawImage(results.segmentationMask, 0, 0, results.image.width, results.image.height);
+
+            // Update smoothed mask with result
+            smoothedMaskCtx.globalCompositeOperation = 'copy';
             smoothedMaskCtx.globalAlpha = 1.0;
-
+            smoothedMaskCtx.drawImage(tempMaskCanvas, 0, 0);
 
             // 3. Main Rendering
             ctx.save();
