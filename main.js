@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // =========================================================
@@ -36,15 +38,71 @@ renderer.setSize(STATE.width, STATE.height);
 renderer.setPixelRatio(window.devicePixelRatio);
 
 // --- Post Processing ---
+// --- Post Processing (Selective Bloom) ---
 const renderScene = new RenderPass(scene, camera);
+
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(STATE.width, STATE.height), 1.5, 0.4, 0.85);
-bloomPass.threshold = 0.2; // Increase threshold to avoid blooming everything
-bloomPass.strength = 0.8;  // Reduce strength significantly
+bloomPass.threshold = 0;
+bloomPass.strength = 1.5; // Restore strength for neon
 bloomPass.radius = 0.5;
 
-const composer = new EffectComposer(renderer);
-composer.addPass(renderScene);
-composer.addPass(bloomPass);
+const bloomComposer = new EffectComposer(renderer);
+bloomComposer.renderToScreen = false;
+bloomComposer.addPass(renderScene);
+bloomComposer.addPass(bloomPass);
+
+const mixPass = new ShaderPass(
+    new THREE.ShaderMaterial({
+        uniforms: {
+            baseTexture: { value: null },
+            bloomTexture: { value: bloomComposer.renderTarget2.texture }
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+            }
+        `,
+        fragmentShader: `
+            uniform sampler2D baseTexture;
+            uniform sampler2D bloomTexture;
+            varying vec2 vUv;
+            void main() {
+                gl_FragColor = ( texture2D( baseTexture, vUv ) + vec4( 1.0 ) * texture2D( bloomTexture, vUv ) );
+            }
+        `,
+        defines: {}
+    }), "baseTexture"
+);
+mixPass.needsSwap = true;
+
+const finalComposer = new EffectComposer(renderer);
+finalComposer.addPass(renderScene);
+finalComposer.addPass(mixPass);
+const outputPass = new OutputPass();
+finalComposer.addPass(outputPass);
+
+// Selective Bloom Helpers
+const darkMaterial = new THREE.MeshBasicMaterial({ color: 'black' });
+const materials = {};
+
+function darkenNonBloomed(obj) {
+    if (obj.isMesh && bloomLayer.test(obj.layers) === false) {
+        materials[obj.uuid] = obj.material;
+        obj.material = darkMaterial;
+    }
+}
+
+function restoreMaterial(obj) {
+    if (materials[obj.uuid]) {
+        obj.material = materials[obj.uuid];
+        delete materials[obj.uuid];
+    }
+}
+
+const bloomLayer = new THREE.Layers();
+bloomLayer.set(1); // Layer 1 is for blooming objects
 
 // =========================================================
 //  === ASSETS & OBJECTS ===
@@ -178,6 +236,12 @@ loader.load('./model.gltf', (gltf) => {
     neonModel.add(neonLight);
 
     neonModel.position.z = -5;
+
+    // Enable bloom for Neon
+    neonModel.traverse((child) => {
+        child.layers.enable(1);
+    });
+
     scene.add(neonModel);
     fitObjectToScreen(neonModel, -5, 0.9);
 }, undefined, (err) => console.error(err));
@@ -364,14 +428,10 @@ function setMode(modeIndex) {
 //  === MEDIAPIPE LOGIC ===
 // =========================================================
 
-const smoothCanvas = document.createElement('canvas');
-const smoothCtx = smoothCanvas.getContext('2d');
-const tempMaskCanvas = document.createElement('canvas'); // New temp canvas for opaque mask
-const tempMaskCtx = tempMaskCanvas.getContext('2d');
+// Removed smoothCanvas and tempMaskCanvas to prevent ghosting
+// We will draw directly to the textures
 
 let isFirstFrame = true;
-const MASK_SMOOTHING_ALPHA = 0.35;
-const MASK_BLUR_PX = 3;
 
 function onResults(results) {
     // Update canvas sizes on first frame or when dimensions change
@@ -383,10 +443,7 @@ function onResults(results) {
         userVideoCanvas.height = results.image.height;
         userMaskCanvas.width = results.image.width;
         userMaskCanvas.height = results.image.height;
-        smoothCanvas.width = results.image.width;
-        smoothCanvas.height = results.image.height;
-        tempMaskCanvas.width = results.image.width;
-        tempMaskCanvas.height = results.image.height;
+        // smoothCanvas/tempMaskCanvas removed
 
         // Recreate textures to match new dimensions
         if (userVideoTexture) userVideoTexture.dispose();
@@ -410,24 +467,7 @@ function onResults(results) {
         isFirstFrame = true;
     }
 
-    // 1. Process Mask (Smoothing)
-    // Ensure the new mask is drawn onto an opaque black background first
-    // This prevents transparency in the source from failing to overwrite the old mask
-    tempMaskCtx.fillStyle = 'black';
-    tempMaskCtx.fillRect(0, 0, tempMaskCanvas.width, tempMaskCanvas.height);
-    tempMaskCtx.drawImage(results.segmentationMask, 0, 0, tempMaskCanvas.width, tempMaskCanvas.height);
-
-    if (isFirstFrame) {
-        smoothCtx.drawImage(tempMaskCanvas, 0, 0, smoothCanvas.width, smoothCanvas.height);
-        isFirstFrame = false;
-    } else {
-        smoothCtx.globalCompositeOperation = 'source-over';
-        smoothCtx.globalAlpha = MASK_SMOOTHING_ALPHA;
-        smoothCtx.drawImage(tempMaskCanvas, 0, 0, smoothCanvas.width, smoothCanvas.height);
-        smoothCtx.globalAlpha = 1.0;
-    }
-
-    // 2. Draw Video to Texture Canvas (Mirrored)
+    // 1. Draw Video to Texture Canvas (Mirrored)
     userVideoCtx.save();
     userVideoCtx.clearRect(0, 0, userVideoCanvas.width, userVideoCanvas.height);
     userVideoCtx.translate(userVideoCanvas.width, 0);
@@ -435,13 +475,15 @@ function onResults(results) {
     userVideoCtx.drawImage(results.image, 0, 0, userVideoCanvas.width, userVideoCanvas.height);
     userVideoCtx.restore();
 
-    // 3. Draw Mask to Texture Canvas (Mirrored + Blur)
+    // 2. Draw Mask to Texture Canvas (Mirrored + Blur)
+    // Direct draw, no smoothing
     userMaskCtx.save();
     userMaskCtx.clearRect(0, 0, userMaskCanvas.width, userMaskCanvas.height);
     userMaskCtx.translate(userMaskCanvas.width, 0);
     userMaskCtx.scale(-1, 1);
-    userMaskCtx.filter = `blur(${MASK_BLUR_PX}px)`;
-    userMaskCtx.drawImage(smoothCanvas, 0, 0, userMaskCanvas.width, userMaskCanvas.height);
+    // Optional: Keep a slight blur for edge softness, but no temporal smoothing
+    userMaskCtx.filter = 'blur(2px)';
+    userMaskCtx.drawImage(results.segmentationMask, 0, 0, userMaskCanvas.width, userMaskCanvas.height);
     userMaskCtx.filter = 'none';
     userMaskCtx.restore();
 
@@ -499,7 +541,15 @@ function animate() {
         mainModel.position.y = Math.sin(time) * 0.5;
     }
 
-    composer.render();
+    // Selective Bloom Rendering
+
+    // 1. Render Bloom (Darken non-bloomed objects)
+    scene.traverse(darkenNonBloomed);
+    bloomComposer.render();
+    scene.traverse(restoreMaterial);
+
+    // 2. Render Final Scene (Mix bloom)
+    finalComposer.render();
 }
 animate();
 
@@ -515,7 +565,8 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
 
     renderer.setSize(STATE.width, STATE.height);
-    composer.setSize(STATE.width, STATE.height);
+    bloomComposer.setSize(STATE.width, STATE.height);
+    finalComposer.setSize(STATE.width, STATE.height);
     bloomPass.resolution.set(STATE.width, STATE.height);
 
     fitPlanesToScreen();
