@@ -82,23 +82,21 @@ scene.add(lightCatcherPlane);
 
 // 3. User Plane (Shader Material)
 const userVideoCanvas = document.createElement('canvas');
-userVideoCanvas.width = 1280;
-userVideoCanvas.height = 720;
+// Don't hardcode dimensions - let MediaPipe set them based on actual camera resolution
 const userVideoCtx = userVideoCanvas.getContext('2d');
 const userVideoTexture = new THREE.CanvasTexture(userVideoCanvas);
 userVideoTexture.minFilter = THREE.LinearFilter;
 userVideoTexture.magFilter = THREE.LinearFilter;
 
 const userMaskCanvas = document.createElement('canvas');
-userMaskCanvas.width = 1280;
-userMaskCanvas.height = 720;
+// Don't hardcode dimensions - let MediaPipe set them based on actual camera resolution
 const userMaskCtx = userMaskCanvas.getContext('2d');
 const userMaskTexture = new THREE.CanvasTexture(userMaskCanvas);
 userMaskTexture.minFilter = THREE.LinearFilter;
 userMaskTexture.magFilter = THREE.LinearFilter;
 
-const DEBUG_MODE = true; // Set to true to see raw video without masking
-const TEST_MODE = true; // Set to true to show solid color (ignores textures entirely)
+const DEBUG_MODE = false; // Set to true to see raw video without masking
+const TEST_MODE = false; // Set to true to show solid color (ignores textures entirely)
 
 const userShaderMaterial = new THREE.ShaderMaterial({
     uniforms: {
@@ -366,8 +364,9 @@ const MASK_SMOOTHING_ALPHA = 0.35;
 const MASK_BLUR_PX = 3;
 
 function onResults(results) {
-    // Update canvas sizes
-    if (userVideoCanvas.width !== results.image.width || userVideoCanvas.height !== results.image.height) {
+    // Update canvas sizes on first frame or when dimensions change
+    if (!userVideoCanvas.width || userVideoCanvas.width !== results.image.width || userVideoCanvas.height !== results.image.height) {
+        console.log('Setting canvas dimensions to:', results.image.width, 'x', results.image.height);
         userVideoCanvas.width = results.image.width;
         userVideoCanvas.height = results.image.height;
         userMaskCanvas.width = results.image.width;
