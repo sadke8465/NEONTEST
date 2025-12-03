@@ -428,13 +428,19 @@ function setMode(modeIndex) {
 //  === MEDIAPIPE LOGIC ===
 // =========================================================
 
-// Removed smoothCanvas and tempMaskCanvas to prevent ghosting
-// We will draw directly to the textures
+// Constants for visual quality
+const MASK_BLUR_PX = 3; // Feathered edges
+const MASK_SMOOTHING_ALPHA = 0.35; // Temporal smoothing (0.1 = heavy smoothing, 1.0 = no smoothing)
+
+// Offscreen canvases for processing
+const smoothCanvas = document.createElement('canvas');
+const smoothCtx = smoothCanvas.getContext('2d');
+const tempMaskCanvas = document.createElement('canvas');
+const tempMaskCtx = tempMaskCanvas.getContext('2d');
 
 let isFirstFrame = true;
 
 function onResults(results) {
-    // Update canvas sizes on first frame or when dimensions change
     // Update canvas sizes on first frame or when dimensions change
     if (userVideoCanvas.width !== results.image.width || userVideoCanvas.height !== results.image.height) {
         console.log('Resizing canvas dimensions to:', results.image.width, 'x', results.image.height);
@@ -443,7 +449,12 @@ function onResults(results) {
         userVideoCanvas.height = results.image.height;
         userMaskCanvas.width = results.image.width;
         userMaskCanvas.height = results.image.height;
-        // smoothCanvas/tempMaskCanvas removed
+
+        // Resize helper canvases
+        smoothCanvas.width = results.image.width;
+        smoothCanvas.height = results.image.height;
+        tempMaskCanvas.width = results.image.width;
+        tempMaskCanvas.height = results.image.height;
 
         // Recreate textures to match new dimensions
         if (userVideoTexture) userVideoTexture.dispose();
@@ -475,29 +486,41 @@ function onResults(results) {
     userVideoCtx.drawImage(results.image, 0, 0, userVideoCanvas.width, userVideoCanvas.height);
     userVideoCtx.restore();
 
-    // 2. Draw Mask to Texture Canvas (Mirrored + Blur)
-    // Direct draw, no smoothing
+    // 2. Process Mask (Temporal Smoothing)
+    // Draw new mask to temp canvas first (to ensure clean source)
+    tempMaskCtx.clearRect(0, 0, tempMaskCanvas.width, tempMaskCanvas.height);
+    tempMaskCtx.drawImage(results.segmentationMask, 0, 0, tempMaskCanvas.width, tempMaskCanvas.height);
+
+    if (isFirstFrame) {
+        // First frame: just copy directly
+        smoothCtx.drawImage(tempMaskCanvas, 0, 0, smoothCanvas.width, smoothCanvas.height);
+        isFirstFrame = false;
+    } else {
+        // Subsequent frames: Blend new mask into smoothCanvas
+        // smoothCanvas holds the "previous" state. We draw the NEW mask on top with low opacity.
+        // Result = New * Alpha + Old * (1 - Alpha)
+        smoothCtx.globalCompositeOperation = 'source-over';
+        smoothCtx.globalAlpha = MASK_SMOOTHING_ALPHA;
+        smoothCtx.drawImage(tempMaskCanvas, 0, 0, smoothCanvas.width, smoothCanvas.height);
+        smoothCtx.globalAlpha = 1.0;
+    }
+
+    // 3. Draw Final Mask to Texture Canvas (Mirrored + Blur)
     userMaskCtx.save();
     userMaskCtx.clearRect(0, 0, userMaskCanvas.width, userMaskCanvas.height);
     userMaskCtx.translate(userMaskCanvas.width, 0);
     userMaskCtx.scale(-1, 1);
-    // Optional: Keep a slight blur for edge softness, but no temporal smoothing
-    userMaskCtx.filter = 'blur(2px)';
-    userMaskCtx.drawImage(results.segmentationMask, 0, 0, userMaskCanvas.width, userMaskCanvas.height);
+
+    // Apply blur filter for soft edges
+    userMaskCtx.filter = `blur(${MASK_BLUR_PX}px)`;
+    userMaskCtx.drawImage(smoothCanvas, 0, 0, userMaskCanvas.width, userMaskCanvas.height);
     userMaskCtx.filter = 'none';
+
     userMaskCtx.restore();
 
     // 4. Update Textures
     if (userVideoTexture) userVideoTexture.needsUpdate = true;
     if (userMaskTexture) userMaskTexture.needsUpdate = true;
-
-    // Debug logging (remove after fixing)
-    if (Math.random() < 0.02) { // Log occasionally to avoid spam
-        console.log('MediaPipe frame received:', results.image.width, 'x', results.image.height);
-        console.log('User plane visible:', userPlane.visible);
-        console.log('User plane position:', userPlane.position.z);
-        console.log('User plane scale:', userPlane.scale.x, userPlane.scale.y);
-    }
 
     if (statusText.innerText !== "System Active" && statusText.innerText !== "Tracking Active") {
         statusText.innerText = "Tracking Active";
@@ -507,7 +530,11 @@ function onResults(results) {
 const selfieSegmentation = new SelfieSegmentation({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
 });
-selfieSegmentation.setOptions({ modelSelection: 1, selfieMode: false });
+selfieSegmentation.setOptions({
+    modelSelection: 1,   // 1 = Landscape/High Quality
+    selfieMode: true     // true = Mirror mode (built-in)
+    // If not using front camera, set selfieMode: false
+});
 selfieSegmentation.onResults(onResults);
 
 const mpCamera = new Camera(videoElement, {
