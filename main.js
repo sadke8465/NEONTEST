@@ -12,11 +12,8 @@ const STATE = {
     mode: 0, // 0: None, 1-5: Modes
     width: window.innerWidth,
     height: window.innerHeight,
-    userZ: 0,
-    neonZ: -5,
-    bgZ: -10,
-    modelFrontZ: 3,
-    modelBackZ: -3
+    // Z-Positions will be dynamic based on mode, but defaults:
+    bgZ: -10
 };
 
 // =========================================================
@@ -25,9 +22,7 @@ const STATE = {
 
 const bgCanvas = document.getElementById('bg_canvas');
 const statusText = document.getElementById('status');
-const videoElement = document.querySelector('.input_video'); // Use the one in DOM
-// videoElement.autoplay = true; // Already set in HTML
-// videoElement.playsInline = true; // Already set in HTML
+const videoElement = document.querySelector('.input_video');
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
@@ -58,7 +53,7 @@ const loader = new GLTFLoader();
 const textureLoader = new THREE.TextureLoader();
 
 // 1. Textured Background
-const bgGeometry = new THREE.PlaneGeometry(1, 1, 128, 128); // Size will be scaled
+const bgGeometry = new THREE.PlaneGeometry(1, 1, 128, 128);
 const bgDiffuse = textureLoader.load('./bg_diffuse.png');
 const bgDisplacement = textureLoader.load('./bg_displacement.png');
 const bgMaterial = new THREE.MeshStandardMaterial({
@@ -84,25 +79,53 @@ lightCatcherPlane.position.z = STATE.bgZ;
 lightCatcherPlane.visible = false;
 scene.add(lightCatcherPlane);
 
-// 3. User Plane
-// We will update this texture from the canvas that MediaPipe draws to
-const userCanvas = document.createElement('canvas');
-userCanvas.width = 1280;
-userCanvas.height = 720;
-const userCtx = userCanvas.getContext('2d');
-const userTexture = new THREE.CanvasTexture(userCanvas);
-userTexture.minFilter = THREE.LinearFilter;
-userTexture.magFilter = THREE.LinearFilter;
-userTexture.format = THREE.RGBAFormat;
+// 3. User Plane (Shader Material)
+const userVideoCanvas = document.createElement('canvas');
+userVideoCanvas.width = 1280;
+userVideoCanvas.height = 720;
+const userVideoCtx = userVideoCanvas.getContext('2d');
+const userVideoTexture = new THREE.CanvasTexture(userVideoCanvas);
+userVideoTexture.minFilter = THREE.LinearFilter;
+userVideoTexture.magFilter = THREE.LinearFilter;
 
-const userMaterial = new THREE.MeshBasicMaterial({
-    map: userTexture,
+const userMaskCanvas = document.createElement('canvas');
+userMaskCanvas.width = 1280;
+userMaskCanvas.height = 720;
+const userMaskCtx = userMaskCanvas.getContext('2d');
+const userMaskTexture = new THREE.CanvasTexture(userMaskCanvas);
+userMaskTexture.minFilter = THREE.LinearFilter;
+userMaskTexture.magFilter = THREE.LinearFilter;
+
+const userShaderMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+        map: { value: userVideoTexture },
+        maskMap: { value: userMaskTexture }
+    },
+    vertexShader: `
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
+    fragmentShader: `
+        uniform sampler2D map;
+        uniform sampler2D maskMap;
+        varying vec2 vUv;
+        void main() {
+            vec4 color = texture2D(map, vUv);
+            vec4 mask = texture2D(maskMap, vUv);
+            // Use red channel of mask as alpha (assuming grayscale mask)
+            gl_FragColor = vec4(color.rgb, mask.r);
+        }
+    `,
     transparent: true,
     side: THREE.DoubleSide
 });
+
 const userGeometry = new THREE.PlaneGeometry(1, 1);
-const userPlane = new THREE.Mesh(userGeometry, userMaterial);
-userPlane.position.z = STATE.userZ;
+const userPlane = new THREE.Mesh(userGeometry, userShaderMaterial);
+userPlane.position.z = 0; // Default
 scene.add(userPlane);
 
 // 4. Neon Sign (model.gltf)
@@ -116,25 +139,23 @@ loader.load('./model.gltf', (gltf) => {
         if (child.isMesh) child.material = neonMaterial;
     });
 
-    // Attach Light
     neonLight = new THREE.PointLight(0xEB292D, 2, 20);
     neonLight.position.set(0, 5, 0);
     neonModel.add(neonLight);
 
-    neonModel.position.z = STATE.neonZ;
+    neonModel.position.z = -5;
     scene.add(neonModel);
-    fitObjectToScreen(neonModel, STATE.neonZ, 0.9); // Initial fit
+    fitObjectToScreen(neonModel, -5, 0.9);
 }, undefined, (err) => console.error(err));
 
 // 5. 3D Model (model.glb)
 let mainModel = null;
 loader.load('./model.glb', (gltf) => {
     mainModel = gltf.scene;
-    // Keep original materials for the 3D model
-    mainModel.position.z = STATE.modelBackZ;
+    mainModel.position.z = -3;
     mainModel.visible = false;
     scene.add(mainModel);
-    fitObjectToScreen(mainModel, STATE.modelBackZ, 0.5); // Smaller scale
+    fitObjectToScreen(mainModel, -3, 0.5);
 }, undefined, (err) => console.error(err));
 
 
@@ -156,29 +177,21 @@ function fitPlanesToScreen() {
     bgPlane.scale.set(bgSize.width, bgSize.height, 1);
     lightCatcherPlane.scale.set(bgSize.width, bgSize.height, 1);
 
-    // Fit User Plane
-    const userSize = getVisiblePlaneSizeAtZ(STATE.userZ);
+    // Fit User Plane (Dynamic Z)
+    const userSize = getVisiblePlaneSizeAtZ(userPlane.position.z);
     userPlane.scale.set(userSize.width, userSize.height, 1);
 }
 
 function fitObjectToScreen(object, z, widthPct) {
     if (!object) return;
-
-    // Reset transforms to measure
     const originalScale = object.scale.clone();
     object.scale.set(1, 1, 1);
     object.updateMatrixWorld(true);
-
     const box = new THREE.Box3().setFromObject(object);
     const size = new THREE.Vector3();
     box.getSize(size);
-
-    // Restore scale
     object.scale.copy(originalScale);
-
     const visibleSize = getVisiblePlaneSizeAtZ(z);
-
-    // Scale to match target width percentage
     const scaleFactor = (visibleSize.width / size.x) * widthPct;
     object.scale.set(scaleFactor, scaleFactor, scaleFactor);
 }
@@ -196,72 +209,95 @@ function setMode(modeIndex) {
     if (lightCatcherPlane) lightCatcherPlane.visible = false;
     if (neonModel) neonModel.visible = false;
     if (mainModel) mainModel.visible = false;
-    if (userPlane) userPlane.visible = true; // User always visible
+    if (userPlane) userPlane.visible = true;
+
+    // Default Zs
+    userPlane.position.z = 0;
 
     switch (modeIndex) {
         case 1: // TEXTURED BG AND NEON
+            // BG -> Neon(-5) -> User(0)
             if (bgPlane) bgPlane.visible = true;
             if (neonModel) {
                 neonModel.visible = true;
-                neonModel.position.z = STATE.neonZ; // Behind User
+                neonModel.position.z = -5;
             }
+            userPlane.position.z = 0;
             break;
+
         case 2: // ONLY NEON
+            // Light Catcher -> User(-5) -> Neon(0)
             if (lightCatcherPlane) lightCatcherPlane.visible = true;
+            userPlane.position.z = -5;
             if (neonModel) {
                 neonModel.visible = true;
-                neonModel.position.z = STATE.neonZ; // Behind User
+                neonModel.position.z = 0;
             }
             break;
+
         case 3: // NEON AND 3D MODEL
+            // Neon(-5) -> User(0) -> 3D Model(+5)
             if (neonModel) {
                 neonModel.visible = true;
-                neonModel.position.z = STATE.neonZ; // Behind User
+                neonModel.position.z = -5;
             }
+            userPlane.position.z = 0;
             if (mainModel) {
                 mainModel.visible = true;
-                mainModel.position.z = STATE.modelFrontZ; // Front of User
+                mainModel.position.z = 5;
             }
             break;
+
         case 4: // ONLY 3D MODEL
+            // Light Catcher -> 3D Model(-5) -> User(0)
             if (lightCatcherPlane) lightCatcherPlane.visible = true;
             if (mainModel) {
                 mainModel.visible = true;
-                mainModel.position.z = STATE.modelBackZ; // Behind User
+                mainModel.position.z = -5;
             }
+            userPlane.position.z = 0;
             break;
+
         case 5: // 3D MODEL AND TEXTURED BG
+            // BG -> 3D Model(-5) -> User(0)
             if (bgPlane) bgPlane.visible = true;
             if (mainModel) {
                 mainModel.visible = true;
-                mainModel.position.z = STATE.modelBackZ; // Behind User
+                mainModel.position.z = -5;
             }
+            userPlane.position.z = 0;
             break;
     }
+
+    // Re-fit planes and objects after Z change
+    fitPlanesToScreen();
+    if (neonModel) fitObjectToScreen(neonModel, neonModel.position.z, 0.9);
+    if (mainModel) fitObjectToScreen(mainModel, mainModel.position.z, 0.5);
 }
 
 // =========================================================
 //  === MEDIAPIPE LOGIC ===
 // =========================================================
 
-// Offscreen smoothing canvas
 const smoothCanvas = document.createElement('canvas');
 const smoothCtx = smoothCanvas.getContext('2d');
 let isFirstFrame = true;
-const MASK_BLUR_PX = 3;
 const MASK_SMOOTHING_ALPHA = 0.35;
+const MASK_BLUR_PX = 3;
 
 function onResults(results) {
-    // Update canvas sizes if needed
-    if (userCanvas.width !== results.image.width || userCanvas.height !== results.image.height) {
-        userCanvas.width = results.image.width;
-        userCanvas.height = results.image.height;
+    // Update canvas sizes
+    if (userVideoCanvas.width !== results.image.width || userVideoCanvas.height !== results.image.height) {
+        userVideoCanvas.width = results.image.width;
+        userVideoCanvas.height = results.image.height;
+        userMaskCanvas.width = results.image.width;
+        userMaskCanvas.height = results.image.height;
         smoothCanvas.width = results.image.width;
         smoothCanvas.height = results.image.height;
         isFirstFrame = true;
     }
 
-    // 1. Smoothing
+    // 1. Process Mask (Smoothing)
     if (isFirstFrame) {
         smoothCtx.drawImage(results.segmentationMask, 0, 0, smoothCanvas.width, smoothCanvas.height);
         isFirstFrame = false;
@@ -272,27 +308,27 @@ function onResults(results) {
         smoothCtx.globalAlpha = 1.0;
     }
 
-    // 2. Draw to User Canvas
-    userCtx.save();
-    userCtx.clearRect(0, 0, userCanvas.width, userCanvas.height);
+    // 2. Draw Video to Texture Canvas (Mirrored)
+    userVideoCtx.save();
+    userVideoCtx.clearRect(0, 0, userVideoCanvas.width, userVideoCanvas.height);
+    userVideoCtx.translate(userVideoCanvas.width, 0);
+    userVideoCtx.scale(-1, 1);
+    userVideoCtx.drawImage(results.image, 0, 0, userVideoCanvas.width, userVideoCanvas.height);
+    userVideoCtx.restore();
 
-    // Mirror
-    userCtx.translate(userCanvas.width, 0);
-    userCtx.scale(-1, 1);
+    // 3. Draw Mask to Texture Canvas (Mirrored + Blur)
+    userMaskCtx.save();
+    userMaskCtx.clearRect(0, 0, userMaskCanvas.width, userMaskCanvas.height);
+    userMaskCtx.translate(userMaskCanvas.width, 0);
+    userMaskCtx.scale(-1, 1);
+    userMaskCtx.filter = `blur(${MASK_BLUR_PX}px)`;
+    userMaskCtx.drawImage(smoothCanvas, 0, 0, userMaskCanvas.width, userMaskCanvas.height);
+    userMaskCtx.filter = 'none';
+    userMaskCtx.restore();
 
-    // Draw Mask
-    userCtx.filter = `blur(${MASK_BLUR_PX}px)`;
-    userCtx.drawImage(smoothCanvas, 0, 0, userCanvas.width, userCanvas.height);
-    userCtx.filter = 'none';
-
-    // Composite Video
-    userCtx.globalCompositeOperation = 'source-in';
-    userCtx.drawImage(results.image, 0, 0, userCanvas.width, userCanvas.height);
-
-    userCtx.restore();
-
-    // 3. Update Texture
-    if (userTexture) userTexture.needsUpdate = true;
+    // 4. Update Textures
+    if (userVideoTexture) userVideoTexture.needsUpdate = true;
+    if (userMaskTexture) userMaskTexture.needsUpdate = true;
 
     if (statusText.innerText !== "System Active" && statusText.innerText !== "Tracking Active") {
         statusText.innerText = "Tracking Active";
@@ -331,8 +367,8 @@ function animate() {
 
     // Model Animation
     if (mainModel && mainModel.visible) {
-        mainModel.rotation.y = time * 0.5; // Rotate Y
-        mainModel.position.y = Math.sin(time) * 0.5; // Float up/down
+        mainModel.rotation.y = time * 0.5;
+        mainModel.position.y = Math.sin(time) * 0.5;
     }
 
     composer.render();
