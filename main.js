@@ -126,6 +126,7 @@ const userShaderMaterial = new THREE.ShaderMaterial({
 const userGeometry = new THREE.PlaneGeometry(1, 1);
 const userPlane = new THREE.Mesh(userGeometry, userShaderMaterial);
 userPlane.position.z = 0; // Default
+userPlane.renderOrder = 1; // Ensure it sorts correctly with transparency
 scene.add(userPlane);
 
 // 4. Neon Sign (model.gltf)
@@ -173,13 +174,23 @@ function getVisiblePlaneSizeAtZ(z) {
 
 function fitPlanesToScreen() {
     // Fit BG Plane
-    const bgSize = getVisiblePlaneSizeAtZ(STATE.bgZ);
-    bgPlane.scale.set(bgSize.width, bgSize.height, 1);
-    lightCatcherPlane.scale.set(bgSize.width, bgSize.height, 1);
+    if (bgPlane) {
+        const bgSize = getVisiblePlaneSizeAtZ(STATE.bgZ);
+        bgPlane.scale.set(bgSize.width, bgSize.height, 1);
+    }
+    if (lightCatcherPlane) {
+        const lcSize = getVisiblePlaneSizeAtZ(STATE.bgZ);
+        lightCatcherPlane.scale.set(lcSize.width, lcSize.height, 1);
+    }
 
     // Fit User Plane (Dynamic Z)
-    const userSize = getVisiblePlaneSizeAtZ(userPlane.position.z);
-    userPlane.scale.set(userSize.width, userSize.height, 1);
+    if (userPlane) {
+        const userSize = getVisiblePlaneSizeAtZ(userPlane.position.z);
+        // Prevent zero scale
+        const safeWidth = Math.max(userSize.width, 0.1);
+        const safeHeight = Math.max(userSize.height, 0.1);
+        userPlane.scale.set(safeWidth, safeHeight, 1);
+    }
 }
 
 function fitObjectToScreen(object, z, widthPct) {
@@ -204,31 +215,48 @@ function setMode(modeIndex) {
     STATE.mode = modeIndex;
     console.log("Switching to Mode:", modeIndex);
 
-    // Reset Visibility
+    // 1. Reset Visibility & Defaults
     if (bgPlane) bgPlane.visible = false;
     if (lightCatcherPlane) lightCatcherPlane.visible = false;
     if (neonModel) neonModel.visible = false;
     if (mainModel) mainModel.visible = false;
-    if (userPlane) userPlane.visible = true;
 
-    // Default Zs
-    userPlane.position.z = 0;
+    // User plane always visible by default, unless specific mode hides it (none do)
+    if (userPlane) {
+        userPlane.visible = true;
+        userPlane.renderOrder = 1; // Standard
+    }
 
+    // 2. Apply Mode Logic
     switch (modeIndex) {
         case 1: // TEXTURED BG AND NEON
-            // BG -> Neon(-5) -> User(0)
-            if (bgPlane) bgPlane.visible = true;
+            // Deepest → Textured BG plane (visible)
+            // Middle → Neon sign (behind user)
+            // Nearest → User plane (visible)
+            if (bgPlane) {
+                bgPlane.visible = true;
+                bgPlane.position.z = STATE.bgZ; // -10
+            }
             if (neonModel) {
                 neonModel.visible = true;
                 neonModel.position.z = -5;
             }
-            userPlane.position.z = 0;
+            if (userPlane) {
+                userPlane.position.z = 0;
+            }
             break;
 
         case 2: // ONLY NEON
-            // Light Catcher -> User(-5) -> Neon(0)
-            if (lightCatcherPlane) lightCatcherPlane.visible = true;
-            userPlane.position.z = -5;
+            // Deepest → Transparent light catcher (visible)
+            // Middle → User plane (behind neon sign)
+            // Nearest → Neon sign (visible)
+            if (lightCatcherPlane) {
+                lightCatcherPlane.visible = true;
+                lightCatcherPlane.position.z = STATE.bgZ; // -10
+            }
+            if (userPlane) {
+                userPlane.position.z = -5;
+            }
             if (neonModel) {
                 neonModel.visible = true;
                 neonModel.position.z = 0;
@@ -236,43 +264,67 @@ function setMode(modeIndex) {
             break;
 
         case 3: // NEON AND 3D MODEL
-            // Neon(-5) -> User(0) -> 3D Model(+5)
+            // Deepest → Neon sign (behind user)
+            // Middle → User plane (visible)
+            // Nearest → 3D model (visible, rotating in front of user)
             if (neonModel) {
                 neonModel.visible = true;
                 neonModel.position.z = -5;
             }
-            userPlane.position.z = 0;
+            if (userPlane) {
+                userPlane.position.z = 0;
+            }
             if (mainModel) {
                 mainModel.visible = true;
-                mainModel.position.z = 5;
+                mainModel.position.z = 5; // Closer to camera (10)
             }
             break;
 
         case 4: // ONLY 3D MODEL
-            // Light Catcher -> 3D Model(-5) -> User(0)
-            if (lightCatcherPlane) lightCatcherPlane.visible = true;
+            // Deepest → Transparent light catcher
+            // Middle → 3D model (rotating behind user)
+            // Nearest → User plane
+            if (lightCatcherPlane) {
+                lightCatcherPlane.visible = true;
+                lightCatcherPlane.position.z = STATE.bgZ;
+            }
             if (mainModel) {
                 mainModel.visible = true;
                 mainModel.position.z = -5;
             }
-            userPlane.position.z = 0;
+            if (userPlane) {
+                userPlane.position.z = 0;
+            }
             break;
 
         case 5: // 3D MODEL AND TEXTURED BG
-            // BG -> 3D Model(-5) -> User(0)
-            if (bgPlane) bgPlane.visible = true;
+            // Deepest → Textured BG
+            // Middle → 3D model (behind user)
+            // Nearest → User plane
+            if (bgPlane) {
+                bgPlane.visible = true;
+                bgPlane.position.z = STATE.bgZ;
+            }
             if (mainModel) {
                 mainModel.visible = true;
                 mainModel.position.z = -5;
             }
-            userPlane.position.z = 0;
+            if (userPlane) {
+                userPlane.position.z = 0;
+            }
             break;
     }
 
-    // Re-fit planes and objects after Z change
+    // 3. Re-fit planes and objects
     fitPlanesToScreen();
-    if (neonModel) fitObjectToScreen(neonModel, neonModel.position.z, 0.9);
-    if (mainModel) fitObjectToScreen(mainModel, mainModel.position.z, 0.5);
+
+    // Fit objects if they are visible
+    if (neonModel && neonModel.visible) {
+        fitObjectToScreen(neonModel, neonModel.position.z, 0.9);
+    }
+    if (mainModel && mainModel.visible) {
+        fitObjectToScreen(mainModel, mainModel.position.z, 0.5);
+    }
 }
 
 // =========================================================
@@ -317,10 +369,14 @@ function onResults(results) {
     userVideoCtx.restore();
 
     // 3. Draw Mask to Texture Canvas (Mirrored + Blur)
+    // Note: With selfieMode: true, the mask comes out mirrored.
+    // We want the mask to match the mirrored video.
+    // Video is flipped (-1, 1).
+    // Mask is ALREADY flipped by selfieMode.
+    // So we draw mask normally (1, 1) to match the flipped video.
     userMaskCtx.save();
     userMaskCtx.clearRect(0, 0, userMaskCanvas.width, userMaskCanvas.height);
-    userMaskCtx.translate(userMaskCanvas.width, 0);
-    userMaskCtx.scale(-1, 1);
+    // No flip needed for mask if selfieMode is true
     userMaskCtx.filter = `blur(${MASK_BLUR_PX}px)`;
     userMaskCtx.drawImage(smoothCanvas, 0, 0, userMaskCanvas.width, userMaskCanvas.height);
     userMaskCtx.filter = 'none';
@@ -338,7 +394,7 @@ function onResults(results) {
 const selfieSegmentation = new SelfieSegmentation({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
 });
-selfieSegmentation.setOptions({ modelSelection: 1, selfieMode: false });
+selfieSegmentation.setOptions({ modelSelection: 1, selfieMode: true });
 selfieSegmentation.onResults(onResults);
 
 const mpCamera = new Camera(videoElement, {
