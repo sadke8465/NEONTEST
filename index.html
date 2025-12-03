@@ -35,6 +35,9 @@
         <canvas class="output_canvas" width="1280" height="720"></canvas>
     </div>
 
+    <!-- MediaPipe requires a video element in the DOM for reliable playback in some environments -->
+    <video class="input_video" playsinline autoplay></video>
+
     <!-- Menu Overlay -->
     <div id="menu-overlay">
         <div class="menu-container">

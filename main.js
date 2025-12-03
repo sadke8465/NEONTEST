@@ -25,9 +25,9 @@ const STATE = {
 
 const bgCanvas = document.getElementById('bg_canvas');
 const statusText = document.getElementById('status');
-const videoElement = document.createElement('video'); // Offscreen video
-videoElement.autoplay = true;
-videoElement.playsInline = true;
+const videoElement = document.querySelector('.input_video'); // Use the one in DOM
+// videoElement.autoplay = true; // Already set in HTML
+// videoElement.playsInline = true; // Already set in HTML
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
@@ -115,12 +115,12 @@ loader.load('./model.gltf', (gltf) => {
     neonModel.traverse((child) => {
         if (child.isMesh) child.material = neonMaterial;
     });
-    
+
     // Attach Light
     neonLight = new THREE.PointLight(0xEB292D, 2, 20);
     neonLight.position.set(0, 5, 0);
     neonModel.add(neonLight);
-    
+
     neonModel.position.z = STATE.neonZ;
     scene.add(neonModel);
     fitObjectToScreen(neonModel, STATE.neonZ, 0.9); // Initial fit
@@ -163,21 +163,21 @@ function fitPlanesToScreen() {
 
 function fitObjectToScreen(object, z, widthPct) {
     if (!object) return;
-    
+
     // Reset transforms to measure
     const originalScale = object.scale.clone();
     object.scale.set(1, 1, 1);
     object.updateMatrixWorld(true);
-    
+
     const box = new THREE.Box3().setFromObject(object);
     const size = new THREE.Vector3();
     box.getSize(size);
-    
+
     // Restore scale
     object.scale.copy(originalScale);
-    
+
     const visibleSize = getVisiblePlaneSizeAtZ(z);
-    
+
     // Scale to match target width percentage
     const scaleFactor = (visibleSize.width / size.x) * widthPct;
     object.scale.set(scaleFactor, scaleFactor, scaleFactor);
@@ -293,6 +293,10 @@ function onResults(results) {
 
     // 3. Update Texture
     if (userTexture) userTexture.needsUpdate = true;
+
+    if (statusText.innerText !== "System Active" && statusText.innerText !== "Tracking Active") {
+        statusText.innerText = "Tracking Active";
+    }
 }
 
 const selfieSegmentation = new SelfieSegmentation({
