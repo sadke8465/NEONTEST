@@ -38,8 +38,8 @@ renderer.setPixelRatio(window.devicePixelRatio);
 // --- Post Processing ---
 const renderScene = new RenderPass(scene, camera);
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(STATE.width, STATE.height), 1.5, 0.4, 0.85);
-bloomPass.threshold = 0;
-bloomPass.strength = 2.0;
+bloomPass.threshold = 0.2; // Increase threshold to avoid blooming everything
+bloomPass.strength = 0.8;  // Reduce strength significantly
 bloomPass.radius = 0.5;
 
 const composer = new EffectComposer(renderer);
@@ -366,6 +366,9 @@ function setMode(modeIndex) {
 
 const smoothCanvas = document.createElement('canvas');
 const smoothCtx = smoothCanvas.getContext('2d');
+const tempMaskCanvas = document.createElement('canvas'); // New temp canvas for opaque mask
+const tempMaskCtx = tempMaskCanvas.getContext('2d');
+
 let isFirstFrame = true;
 const MASK_SMOOTHING_ALPHA = 0.35;
 const MASK_BLUR_PX = 3;
@@ -382,6 +385,8 @@ function onResults(results) {
         userMaskCanvas.height = results.image.height;
         smoothCanvas.width = results.image.width;
         smoothCanvas.height = results.image.height;
+        tempMaskCanvas.width = results.image.width;
+        tempMaskCanvas.height = results.image.height;
 
         // Recreate textures to match new dimensions
         if (userVideoTexture) userVideoTexture.dispose();
@@ -406,13 +411,19 @@ function onResults(results) {
     }
 
     // 1. Process Mask (Smoothing)
+    // Ensure the new mask is drawn onto an opaque black background first
+    // This prevents transparency in the source from failing to overwrite the old mask
+    tempMaskCtx.fillStyle = 'black';
+    tempMaskCtx.fillRect(0, 0, tempMaskCanvas.width, tempMaskCanvas.height);
+    tempMaskCtx.drawImage(results.segmentationMask, 0, 0, tempMaskCanvas.width, tempMaskCanvas.height);
+
     if (isFirstFrame) {
-        smoothCtx.drawImage(results.segmentationMask, 0, 0, smoothCanvas.width, smoothCanvas.height);
+        smoothCtx.drawImage(tempMaskCanvas, 0, 0, smoothCanvas.width, smoothCanvas.height);
         isFirstFrame = false;
     } else {
         smoothCtx.globalCompositeOperation = 'source-over';
         smoothCtx.globalAlpha = MASK_SMOOTHING_ALPHA;
-        smoothCtx.drawImage(results.segmentationMask, 0, 0, smoothCanvas.width, smoothCanvas.height);
+        smoothCtx.drawImage(tempMaskCanvas, 0, 0, smoothCanvas.width, smoothCanvas.height);
         smoothCtx.globalAlpha = 1.0;
     }
 
@@ -478,7 +489,8 @@ function animate() {
     const flicker = Math.random() > 0.9 ? Math.random() * 0.5 : 0;
     const pulse = Math.sin(time * 2) * 0.1;
 
-    bloomPass.strength = 2.0 + pulse + flicker;
+    // Reduced base strength for bloom to prevent blowout
+    bloomPass.strength = 0.8 + (pulse * 0.2) + (flicker * 0.2);
     if (neonLight) neonLight.intensity = 2.0 + (pulse * 2) + (flicker * 3);
 
     // Model Animation
