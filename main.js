@@ -27,8 +27,9 @@ const videoElement = document.querySelector('.input_video');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
-const camera = new THREE.PerspectiveCamera(45, STATE.width / STATE.height, 0.1, 100);
-camera.position.set(0, 0, 10);
+const camera = new THREE.PerspectiveCamera(45, STATE.width / STATE.height, 0.1, 1000);
+camera.position.set(0, 0, 15); // Move camera further back to see more
+console.log('Camera initialized at position:', camera.position.z);
 
 const renderer = new THREE.WebGLRenderer({ canvas: bgCanvas, antialias: true, alpha: false });
 renderer.setSize(STATE.width, STATE.height);
@@ -97,12 +98,14 @@ userMaskTexture.minFilter = THREE.LinearFilter;
 userMaskTexture.magFilter = THREE.LinearFilter;
 
 const DEBUG_MODE = true; // Set to true to see raw video without masking
+const TEST_MODE = true; // Set to true to show solid color (ignores textures entirely)
 
 const userShaderMaterial = new THREE.ShaderMaterial({
     uniforms: {
         map: { value: userVideoTexture },
         maskMap: { value: userMaskTexture },
-        debugMode: { value: DEBUG_MODE }
+        debugMode: { value: DEBUG_MODE },
+        testMode: { value: TEST_MODE }
     },
     vertexShader: `
         varying vec2 vUv;
@@ -115,13 +118,26 @@ const userShaderMaterial = new THREE.ShaderMaterial({
         uniform sampler2D map;
         uniform sampler2D maskMap;
         uniform bool debugMode;
+        uniform bool testMode;
         varying vec2 vUv;
         void main() {
+            if (testMode) {
+                // TEST MODE: Show solid bright green to verify plane is rendering
+                gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+                return;
+            }
+            
             vec4 color = texture2D(map, vUv);
             
             if (debugMode) {
-                // Debug: show video with 50% alpha to verify video is working
-                gl_FragColor = vec4(color.rgb, 0.8);
+                // Debug: bright magenta background to verify plane is rendering
+                // If texture is black/empty, you'll see magenta
+                // If texture is working, you'll see the video
+                vec3 debugColor = color.rgb;
+                if (length(color.rgb) < 0.1) {
+                    debugColor = vec3(1.0, 0.0, 1.0); // Magenta if texture is black
+                }
+                gl_FragColor = vec4(debugColor, 1.0); // Full opacity in debug
             } else {
                 vec4 mask = texture2D(maskMap, vUv);
                 // Use red channel of mask as alpha (assuming grayscale mask)
@@ -394,6 +410,14 @@ function onResults(results) {
     if (userVideoTexture) userVideoTexture.needsUpdate = true;
     if (userMaskTexture) userMaskTexture.needsUpdate = true;
 
+    // Debug logging (remove after fixing)
+    if (Math.random() < 0.02) { // Log occasionally to avoid spam
+        console.log('MediaPipe frame received:', results.image.width, 'x', results.image.height);
+        console.log('User plane visible:', userPlane.visible);
+        console.log('User plane position:', userPlane.position.z);
+        console.log('User plane scale:', userPlane.scale.x, userPlane.scale.y);
+    }
+
     if (statusText.innerText !== "System Active" && statusText.innerText !== "Tracking Active") {
         statusText.innerText = "Tracking Active";
     }
@@ -462,6 +486,12 @@ window.addEventListener('resize', () => {
 
 // Initial Fit
 fitPlanesToScreen();
+
+// Start in Mode 1 by default so user sees something immediately
+setTimeout(() => {
+    console.log('Auto-starting Mode 1');
+    setMode(1);
+}, 500);
 
 // UI Events
 document.querySelectorAll('.mode-btn').forEach((btn, index) => {
