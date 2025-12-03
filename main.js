@@ -82,16 +82,18 @@ scene.add(lightCatcherPlane);
 
 // 3. User Plane (Shader Material)
 const userVideoCanvas = document.createElement('canvas');
-// Don't hardcode dimensions - let MediaPipe set them based on actual camera resolution
+userVideoCanvas.width = 1280;
+userVideoCanvas.height = 720;
 const userVideoCtx = userVideoCanvas.getContext('2d');
-const userVideoTexture = new THREE.CanvasTexture(userVideoCanvas);
+let userVideoTexture = new THREE.CanvasTexture(userVideoCanvas);
 userVideoTexture.minFilter = THREE.LinearFilter;
 userVideoTexture.magFilter = THREE.LinearFilter;
 
 const userMaskCanvas = document.createElement('canvas');
-// Don't hardcode dimensions - let MediaPipe set them based on actual camera resolution
+userMaskCanvas.width = 1280;
+userMaskCanvas.height = 720;
 const userMaskCtx = userMaskCanvas.getContext('2d');
-const userMaskTexture = new THREE.CanvasTexture(userMaskCanvas);
+let userMaskTexture = new THREE.CanvasTexture(userMaskCanvas);
 userMaskTexture.minFilter = THREE.LinearFilter;
 userMaskTexture.magFilter = THREE.LinearFilter;
 
@@ -370,14 +372,36 @@ const MASK_BLUR_PX = 3;
 
 function onResults(results) {
     // Update canvas sizes on first frame or when dimensions change
-    if (!userVideoCanvas.width || userVideoCanvas.width !== results.image.width || userVideoCanvas.height !== results.image.height) {
-        console.log('Setting canvas dimensions to:', results.image.width, 'x', results.image.height);
+    // Update canvas sizes on first frame or when dimensions change
+    if (userVideoCanvas.width !== results.image.width || userVideoCanvas.height !== results.image.height) {
+        console.log('Resizing canvas dimensions to:', results.image.width, 'x', results.image.height);
+
         userVideoCanvas.width = results.image.width;
         userVideoCanvas.height = results.image.height;
         userMaskCanvas.width = results.image.width;
         userMaskCanvas.height = results.image.height;
         smoothCanvas.width = results.image.width;
         smoothCanvas.height = results.image.height;
+
+        // Recreate textures to match new dimensions
+        if (userVideoTexture) userVideoTexture.dispose();
+        if (userMaskTexture) userMaskTexture.dispose();
+
+        userVideoTexture = new THREE.CanvasTexture(userVideoCanvas);
+        userVideoTexture.minFilter = THREE.LinearFilter;
+        userVideoTexture.magFilter = THREE.LinearFilter;
+
+        userMaskTexture = new THREE.CanvasTexture(userMaskCanvas);
+        userMaskTexture.minFilter = THREE.LinearFilter;
+        userMaskTexture.magFilter = THREE.LinearFilter;
+
+        // Update material uniforms
+        if (userShaderMaterial) {
+            userShaderMaterial.uniforms.map.value = userVideoTexture;
+            userShaderMaterial.uniforms.maskMap.value = userMaskTexture;
+            userShaderMaterial.needsUpdate = true;
+        }
+
         isFirstFrame = true;
     }
 
