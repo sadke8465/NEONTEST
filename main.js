@@ -98,6 +98,11 @@ userMaskTexture.magFilter = THREE.LinearFilter;
 const DEBUG_MODE = false; // Set to true to see raw video without masking
 const TEST_MODE = false; // Set to true to show solid color (ignores textures entirely)
 
+console.log('=== SHADER MODES ===');
+console.log('DEBUG_MODE:', DEBUG_MODE);
+console.log('TEST_MODE:', TEST_MODE);
+console.log('Version: 2024-12-03-23:34');
+
 const userShaderMaterial = new THREE.ShaderMaterial({
     uniforms: {
         map: { value: userVideoTexture },
