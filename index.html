@@ -338,6 +338,15 @@
         const canvasElement = document.getElementsByClassName('output_canvas')[0];
         const ctx = canvasElement.getContext('2d');
 
+        // Segmentation Quality Constants
+        const MASK_BLUR_PX = 3; // Blur radius for soft edges
+        const MASK_SMOOTHING_ALPHA = 0.35; // 0.0 - 1.0 (Lower = more smoothing/lag, Higher = faster/jittery)
+
+        // Offscreen canvas for temporal smoothing
+        const smoothCanvas = document.createElement('canvas');
+        const smoothCtx = smoothCanvas.getContext('2d');
+        let isFirstFrame = true;
+
         function handleResize() {
             width = window.innerWidth;
             height = window.innerHeight;
@@ -354,6 +363,11 @@
             // Update Canvas Size
             canvasElement.width = width;
             canvasElement.height = height;
+
+            // Update Smoothing Canvas Size
+            smoothCanvas.width = width;
+            smoothCanvas.height = height;
+            isFirstFrame = true; // Reset smoothing on resize
 
             fitModelToCamera();
         }
@@ -383,49 +397,30 @@
         }
         animate();
 
-        // =========================================================
-        //  === SEGMENTATION CONFIGURATION ===
-        // =========================================================
-        const MASK_BLUR_PX = 3;
-        const MASK_SMOOTHING_ALPHA = 0.35; // New frame weight
-
-        // Offscreen canvases for temporal smoothing
-        const smoothedMaskCanvas = document.createElement('canvas');
-        const smoothedMaskCtx = smoothedMaskCanvas.getContext('2d');
-        const tempMaskCanvas = document.createElement('canvas');
-        const tempMaskCtx = tempMaskCanvas.getContext('2d');
-
         function onResults(results) {
-            // 1. Prepare Canvases
-            if (smoothedMaskCanvas.width !== results.image.width || smoothedMaskCanvas.height !== results.image.height) {
-                smoothedMaskCanvas.width = results.image.width;
-                smoothedMaskCanvas.height = results.image.height;
-                tempMaskCanvas.width = results.image.width;
-                tempMaskCanvas.height = results.image.height;
+            // 1. Calculate Layout (Cover Mode)
+            const img = results.image;
+            const imgRatio = img.width / img.height;
+            const drawHeight = canvasElement.height;
+            const drawWidth = drawHeight * imgRatio;
+
+            // Center horizontally (flipped context logic handled below)
+            const x = (canvasElement.width - drawWidth) / 2;
+            const y = 0;
+
+            // 2. Temporal Smoothing (Offscreen)
+            // Blend new mask into the smoothing canvas
+            if (isFirstFrame) {
+                smoothCtx.drawImage(results.segmentationMask, x, y, drawWidth, drawHeight);
+                isFirstFrame = false;
+            } else {
+                smoothCtx.globalCompositeOperation = 'source-over';
+                smoothCtx.globalAlpha = MASK_SMOOTHING_ALPHA;
+                smoothCtx.drawImage(results.segmentationMask, x, y, drawWidth, drawHeight);
+                smoothCtx.globalAlpha = 1.0;
             }
 
-            // 2. Temporal Smoothing (Additive Blending)
-            // Goal: Result = (Old * (1 - Alpha)) + (New * Alpha)
-
-            // Clear temp canvas
-            tempMaskCtx.clearRect(0, 0, tempMaskCanvas.width, tempMaskCanvas.height);
-
-            // Draw Old * (1 - Alpha)
-            tempMaskCtx.globalCompositeOperation = 'source-over';
-            tempMaskCtx.globalAlpha = 1.0 - MASK_SMOOTHING_ALPHA;
-            tempMaskCtx.drawImage(smoothedMaskCanvas, 0, 0);
-
-            // Draw New * Alpha (Additively)
-            tempMaskCtx.globalCompositeOperation = 'lighter';
-            tempMaskCtx.globalAlpha = MASK_SMOOTHING_ALPHA;
-            tempMaskCtx.drawImage(results.segmentationMask, 0, 0, results.image.width, results.image.height);
-
-            // Update smoothed mask with result
-            smoothedMaskCtx.globalCompositeOperation = 'copy';
-            smoothedMaskCtx.globalAlpha = 1.0;
-            smoothedMaskCtx.drawImage(tempMaskCanvas, 0, 0);
-
-            // 3. Main Rendering
+            // 3. Main Drawing
             ctx.save();
             ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
@@ -433,29 +428,14 @@
             ctx.translate(canvasElement.width, 0);
             ctx.scale(-1, 1);
 
-            // Calculate scaling to fit height (Cover Mode)
-            const img = results.image;
-            const imgRatio = img.width / img.height;
-
-            // We want height to match canvas height
-            const drawHeight = canvasElement.height;
-            const drawWidth = drawHeight * imgRatio;
-
-            // Center horizontally
-            const x = (canvasElement.width - drawWidth) / 2;
-            const y = 0;
-
-            // 4. Draw Blurred Mask
+            // A. Draw Smoothed Mask with Blur
             ctx.filter = `blur(${MASK_BLUR_PX}px)`;
-            ctx.drawImage(smoothedMaskCanvas, x, y, drawWidth, drawHeight);
+            ctx.drawImage(smoothCanvas, 0, 0, canvasElement.width, canvasElement.height);
             ctx.filter = 'none';
 
-            // 5. Composite Video Source
+            // B. Composite Video Source
             ctx.globalCompositeOperation = 'source-in';
             ctx.drawImage(results.image, x, y, drawWidth, drawHeight);
-
-            // Reset composite operation
-            ctx.globalCompositeOperation = 'source-over';
 
             ctx.restore();
         }
@@ -464,13 +444,8 @@
             const selfieSegmentation = new SelfieSegmentation({
                 locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
             });
-            // Update options: High quality model + Selfie Mode
-            // Note: selfieMode: true might flip the output. 
-            // If double-flipping occurs, set selfieMode: false or remove manual flip.
-            selfieSegmentation.setOptions({
-                modelSelection: 1, // 0: General, 1: Landscape (Higher Quality)
-                selfieMode: true   // Front-facing camera behavior
-            });
+            // High Quality Model (1), Manual Mirroring (selfieMode: false)
+            selfieSegmentation.setOptions({ modelSelection: 1, selfieMode: false });
             selfieSegmentation.onResults(onResults);
 
             const mpCamera = new Camera(videoElement, {
