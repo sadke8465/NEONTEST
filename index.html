@@ -415,7 +415,7 @@
             const selfieSegmentation = new SelfieSegmentation({
                 locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
             });
-            selfieSegmentation.setOptions({ modelSelection: 1, selfieMode: false });
+            selfieSegmentation.setOptions({ modelSelection: 0, selfieMode: false });
             selfieSegmentation.onResults(onResults);
 
             const mpCamera = new Camera(videoElement, {
