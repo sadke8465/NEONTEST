@@ -205,6 +205,21 @@
         let HORIZONTAL_OFFSET = 0.0;
 
         // =========================================================
+        //  === SEGMENTATION QUALITY ENHANCEMENTS ===
+        // =========================================================
+
+        // Mask blur radius (in pixels) for soft feathered edges
+        // Higher values = softer edges, but may look too blurry
+        // Recommended range: 2-5px
+        const MASK_BLUR_PX = 3;
+
+        // Temporal smoothing alpha for reducing flicker
+        // Higher values = more responsive but more flicker
+        // Lower values = smoother but may lag behind movement
+        // Recommended range: 0.3-0.5
+        const MASK_SMOOTHING_ALPHA = 0.35;
+
+        // =========================================================
 
         const bgCanvas = document.getElementById('bg_canvas');
         const statusText = document.getElementById('status');
@@ -338,14 +353,21 @@
         const canvasElement = document.getElementsByClassName('output_canvas')[0];
         const ctx = canvasElement.getContext('2d');
 
-        // Segmentation Quality Constants
-        const MASK_BLUR_PX = 3; // Blur radius for soft edges
-        const MASK_SMOOTHING_ALPHA = 0.75; // Increased to reduce ghosting (was 0.35)
+        // --- Temporal Smoothing Setup ---
+        // Offscreen canvas to store the previous smoothed mask
+        let offscreenCanvas = null;
+        let offscreenCtx = null;
+        let previousMaskData = null;
+        let currentMaskData = null;
 
-        // Offscreen canvas for temporal smoothing
-        const smoothCanvas = document.createElement('canvas');
-        const smoothCtx = smoothCanvas.getContext('2d');
-        let isFirstFrame = true;
+        function initTemporalSmoothing(width, height) {
+            offscreenCanvas = document.createElement('canvas');
+            offscreenCanvas.width = width;
+            offscreenCanvas.height = height;
+            offscreenCtx = offscreenCanvas.getContext('2d');
+            previousMaskData = null; // Will be initialized on first frame
+            currentMaskData = null;
+        }
 
         function handleResize() {
             width = window.innerWidth;
@@ -364,10 +386,8 @@
             canvasElement.width = width;
             canvasElement.height = height;
 
-            // Update Smoothing Canvas Size
-            smoothCanvas.width = width;
-            smoothCanvas.height = height;
-            isFirstFrame = true; // Reset smoothing on resize
+            // Reinitialize temporal smoothing with new dimensions
+            initTemporalSmoothing(width, height);
 
             fitModelToCamera();
         }
@@ -398,29 +418,6 @@
         animate();
 
         function onResults(results) {
-            // 1. Calculate Layout (Cover Mode)
-            const img = results.image;
-            const imgRatio = img.width / img.height;
-            const drawHeight = canvasElement.height;
-            const drawWidth = drawHeight * imgRatio;
-
-            // Center horizontally (flipped context logic handled below)
-            const x = (canvasElement.width - drawWidth) / 2;
-            const y = 0;
-
-            // 2. Temporal Smoothing (Offscreen)
-            // Blend new mask into the smoothing canvas
-            if (isFirstFrame) {
-                smoothCtx.drawImage(results.segmentationMask, x, y, drawWidth, drawHeight);
-                isFirstFrame = false;
-            } else {
-                smoothCtx.globalCompositeOperation = 'source-over';
-                smoothCtx.globalAlpha = MASK_SMOOTHING_ALPHA;
-                smoothCtx.drawImage(results.segmentationMask, x, y, drawWidth, drawHeight);
-                smoothCtx.globalAlpha = 1.0;
-            }
-
-            // 3. Main Drawing
             ctx.save();
             ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
@@ -428,14 +425,86 @@
             ctx.translate(canvasElement.width, 0);
             ctx.scale(-1, 1);
 
-            // A. Draw Smoothed Mask with Blur
-            ctx.filter = `blur(${MASK_BLUR_PX}px)`;
-            ctx.drawImage(smoothCanvas, 0, 0, canvasElement.width, canvasElement.height);
-            ctx.filter = 'none';
+            // Calculate scaling to fit height (Cover Mode)
+            const img = results.image;
+            const imgRatio = img.width / img.height;
 
-            // B. Composite Video Source
+            // We want height to match canvas height
+            const drawHeight = canvasElement.height;
+            const drawWidth = drawHeight * imgRatio;
+
+            // Center horizontally
+            // Note: Since we are flipped, drawing at positive X moves "left" visually.
+            // But the math for centering remains the same relative to the origin.
+            const x = (canvasElement.width - drawWidth) / 2;
+            const y = 0;
+
+            // =========================================================
+            // TEMPORAL SMOOTHING OF SEGMENTATION MASK
+            // =========================================================
+
+            // Initialize offscreen canvas if not already done
+            if (!offscreenCanvas) {
+                initTemporalSmoothing(drawWidth, drawHeight);
+            }
+
+            // Resize offscreen canvas if dimensions changed
+            if (offscreenCanvas.width !== drawWidth || offscreenCanvas.height !== drawHeight) {
+                offscreenCanvas.width = drawWidth;
+                offscreenCanvas.height = drawHeight;
+                previousMaskData = null; // Reset on dimension change
+            }
+
+            // Draw the new mask to offscreen canvas to get ImageData
+            offscreenCtx.clearRect(0, 0, drawWidth, drawHeight);
+            offscreenCtx.drawImage(results.segmentationMask, 0, 0, drawWidth, drawHeight);
+            currentMaskData = offscreenCtx.getImageData(0, 0, drawWidth, drawHeight);
+
+            // Blend with previous mask using exponential moving average
+            if (previousMaskData && previousMaskData.width === currentMaskData.width && previousMaskData.height === currentMaskData.height) {
+                const current = currentMaskData.data;
+                const previous = previousMaskData.data;
+
+                // Blend each pixel: smoothed = alpha * current + (1 - alpha) * previous
+                for (let i = 0; i < current.length; i += 4) {
+                    // Only blend the alpha channel (segmentation mask is grayscale, stored in all channels)
+                    // We'll blend all channels for consistency
+                    current[i] = MASK_SMOOTHING_ALPHA * current[i] + (1 - MASK_SMOOTHING_ALPHA) * previous[i];
+                    current[i + 1] = MASK_SMOOTHING_ALPHA * current[i + 1] + (1 - MASK_SMOOTHING_ALPHA) * previous[i + 1];
+                    current[i + 2] = MASK_SMOOTHING_ALPHA * current[i + 2] + (1 - MASK_SMOOTHING_ALPHA) * previous[i + 2];
+                    current[i + 3] = MASK_SMOOTHING_ALPHA * current[i + 3] + (1 - MASK_SMOOTHING_ALPHA) * previous[i + 3];
+                }
+            }
+
+            // Store current smoothed mask as previous for next frame
+            previousMaskData = new ImageData(
+                new Uint8ClampedArray(currentMaskData.data),
+                currentMaskData.width,
+                currentMaskData.height
+            );
+
+            // Put the smoothed mask back to offscreen canvas
+            offscreenCtx.putImageData(currentMaskData, 0, 0);
+
+            // =========================================================
+            // FEATHERED / BLURRED MASK EDGES
+            // =========================================================
+
+            // Apply blur filter to the smoothed mask for soft edges
+            ctx.filter = `blur(${MASK_BLUR_PX}px)`;
+            ctx.drawImage(offscreenCanvas, x, y, drawWidth, drawHeight);
+            ctx.filter = 'none'; // Reset filter
+
+            // =========================================================
+            // COMPOSITE FINAL IMAGE
+            // =========================================================
+
+            // Use the blurred mask as a stencil
             ctx.globalCompositeOperation = 'source-in';
             ctx.drawImage(results.image, x, y, drawWidth, drawHeight);
+
+            // Reset composite operation for next frame
+            ctx.globalCompositeOperation = 'source-over';
 
             ctx.restore();
         }
@@ -444,8 +513,21 @@
             const selfieSegmentation = new SelfieSegmentation({
                 locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
             });
-            // High Quality Model (1), Manual Mirroring (selfieMode: false)
-            selfieSegmentation.setOptions({ modelSelection: 1, selfieMode: false });
+
+            // =========================================================
+            // HIGHER-QUALITY MEDIAPIPE MODEL OPTIONS
+            // =========================================================
+            // modelSelection: 1 = Higher quality model (more accurate but slower)
+            // modelSelection: 0 = Faster model (less accurate but faster)
+            //
+            // selfieMode: true = Optimized for front-facing camera (mirrors detection)
+            // selfieMode: false = Use this if you're NOT using a front-facing camera
+            //                     (e.g., rear camera, or pre-recorded video)
+            selfieSegmentation.setOptions({
+                modelSelection: 1,   // Higher quality model
+                selfieMode: true     // Front-facing camera behavior
+            });
+
             selfieSegmentation.onResults(onResults);
 
             const mpCamera = new Camera(videoElement, {
