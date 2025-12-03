@@ -387,6 +387,10 @@
             ctx.save();
             ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
+            // Mirror Effect: Flip Horizontally
+            ctx.translate(canvasElement.width, 0);
+            ctx.scale(-1, 1);
+
             // Calculate scaling to fit height (Cover Mode)
             const img = results.image;
             const imgRatio = img.width / img.height;
@@ -396,6 +400,8 @@
             const drawWidth = drawHeight * imgRatio;
 
             // Center horizontally
+            // Note: Since we are flipped, drawing at positive X moves "left" visually.
+            // But the math for centering remains the same relative to the origin.
             const x = (canvasElement.width - drawWidth) / 2;
             const y = 0;
 
@@ -414,8 +420,8 @@
 
             const mpCamera = new Camera(videoElement, {
                 onFrame: async () => { await selfieSegmentation.send({ image: videoElement }); },
-                width: 1280,
-                height: 720
+                width: 1920,
+                height: 1080
             });
             mpCamera.start();
         } catch (e) {
