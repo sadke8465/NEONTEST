@@ -96,10 +96,13 @@ const userMaskTexture = new THREE.CanvasTexture(userMaskCanvas);
 userMaskTexture.minFilter = THREE.LinearFilter;
 userMaskTexture.magFilter = THREE.LinearFilter;
 
+const DEBUG_MODE = false; // Set to true to see raw video without masking
+
 const userShaderMaterial = new THREE.ShaderMaterial({
     uniforms: {
         map: { value: userVideoTexture },
-        maskMap: { value: userMaskTexture }
+        maskMap: { value: userMaskTexture },
+        debugMode: { value: DEBUG_MODE }
     },
     vertexShader: `
         varying vec2 vUv;
@@ -111,16 +114,25 @@ const userShaderMaterial = new THREE.ShaderMaterial({
     fragmentShader: `
         uniform sampler2D map;
         uniform sampler2D maskMap;
+        uniform bool debugMode;
         varying vec2 vUv;
         void main() {
             vec4 color = texture2D(map, vUv);
-            vec4 mask = texture2D(maskMap, vUv);
-            // Use red channel of mask as alpha (assuming grayscale mask)
-            gl_FragColor = vec4(color.rgb, mask.r);
+            
+            if (debugMode) {
+                // Debug: show video with 50% alpha to verify video is working
+                gl_FragColor = vec4(color.rgb, 0.8);
+            } else {
+                vec4 mask = texture2D(maskMap, vUv);
+                // Use red channel of mask as alpha (assuming grayscale mask)
+                gl_FragColor = vec4(color.rgb, mask.r);
+            }
         }
     `,
     transparent: true,
-    side: THREE.DoubleSide
+    side: THREE.DoubleSide,
+    depthTest: true,
+    depthWrite: false
 });
 
 const userGeometry = new THREE.PlaneGeometry(1, 1);
@@ -369,14 +381,10 @@ function onResults(results) {
     userVideoCtx.restore();
 
     // 3. Draw Mask to Texture Canvas (Mirrored + Blur)
-    // Note: With selfieMode: true, the mask comes out mirrored.
-    // We want the mask to match the mirrored video.
-    // Video is flipped (-1, 1).
-    // Mask is ALREADY flipped by selfieMode.
-    // So we draw mask normally (1, 1) to match the flipped video.
     userMaskCtx.save();
     userMaskCtx.clearRect(0, 0, userMaskCanvas.width, userMaskCanvas.height);
-    // No flip needed for mask if selfieMode is true
+    userMaskCtx.translate(userMaskCanvas.width, 0);
+    userMaskCtx.scale(-1, 1);
     userMaskCtx.filter = `blur(${MASK_BLUR_PX}px)`;
     userMaskCtx.drawImage(smoothCanvas, 0, 0, userMaskCanvas.width, userMaskCanvas.height);
     userMaskCtx.filter = 'none';
@@ -394,7 +402,7 @@ function onResults(results) {
 const selfieSegmentation = new SelfieSegmentation({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
 });
-selfieSegmentation.setOptions({ modelSelection: 1, selfieMode: true });
+selfieSegmentation.setOptions({ modelSelection: 1, selfieMode: false });
 selfieSegmentation.onResults(onResults);
 
 const mpCamera = new Camera(videoElement, {
