@@ -96,7 +96,7 @@ const userMaskTexture = new THREE.CanvasTexture(userMaskCanvas);
 userMaskTexture.minFilter = THREE.LinearFilter;
 userMaskTexture.magFilter = THREE.LinearFilter;
 
-const DEBUG_MODE = false; // Set to true to see raw video without masking
+const DEBUG_MODE = true; // Set to true to see raw video without masking
 
 const userShaderMaterial = new THREE.ShaderMaterial({
     uniforms: {
