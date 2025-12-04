@@ -132,6 +132,7 @@
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
         // =========================================================
         //  === CONFIGURATION ===
@@ -176,9 +177,15 @@
         const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, alpha: true, antialias: true });
         renderer.setSize(width, height);
         renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; // Better looking colors for GI
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+        // Global Illumination (Environment Map)
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 
         // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Reduced ambient since we have GI
         scene.add(ambientLight);
 
         const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
@@ -271,9 +278,10 @@
 
             // Breathing Animation
             if (loadedModel) {
-                // Pulse scale: Base + sine wave
-                // e.g., oscillate between 0.9 and 1.1 scale
-                const scale = MODEL_SCALE_BASE + Math.sin(time * 2.0) * 0.1;
+                // Pulse scale: Oscillate between 1.1 and 1.2
+                // Center = 1.15, Amplitude = 0.05
+                // Slower speed: time * 1.0 (was 2.0)
+                const scale = 1.15 + Math.sin(time * 1.0) * 0.05;
                 loadedModel.scale.set(scale, scale, scale);
 
                 // Subtle rotation

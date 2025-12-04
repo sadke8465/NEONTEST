@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selfie Mode 3</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: monospace;
+        }
+
+        #container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #three_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .input_video {
+            display: none;
+        }
+
+        #status {
+            position: absolute;
+            color: cyan;
+            z-index: 3;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 12px;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        /* Back button */
+        #back_btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 4;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            border: 1px solid white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-family: sans-serif;
+            text-transform: uppercase;
+            font-size: 12px;
+            backdrop-filter: blur(4px);
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+
+    <div id="container">
+        <div id="status">Initializing...</div>
+        <a href="index.html" id="back_btn">Back</a>
+
+        <canvas id="three_canvas"></canvas>
+    </div>
+    <video class="input_video" playsinline muted></video>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // =========================================================
+        //  === CONFIGURATION ===
+        // =========================================================
+
+        const MODEL_SCALE_BASE = 1.0;
+        const BLOOM_THRESHOLD = 0.8; // High threshold to avoid video blooming
+        const BLOOM_STRENGTH = 1.5;
+        const BLOOM_RADIUS = 0.4;
+
+        // =========================================================
+        //  === SETUP ===
+        // =========================================================
+
+        const threeCanvas = document.getElementById('three_canvas');
+        const statusText = document.getElementById('status');
+        const videoElement = document.querySelector('.input_video');
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+
+        // =========================================================
+        //  === THREE.JS SCENE ===
+        // =========================================================
+
+        const scene = new THREE.Scene();
+
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+        camera.position.set(0, 0, 5);
+
+        const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+        // =========================================================
+        //  === VIDEO BACKGROUND (Layer 1) ===
+        // =========================================================
+
+        const videoTexture = new THREE.VideoTexture(videoElement);
+        videoTexture.colorSpace = THREE.SRGBColorSpace;
+
+        // Plane for video
+        // We will scale this in handleResize to cover the screen
+        const videoGeometry = new THREE.PlaneGeometry(16, 9);
+        const videoMaterial = new THREE.MeshStandardMaterial({
+            map: videoTexture,
+            side: THREE.DoubleSide,
+            roughness: 1,
+            metalness: 0,
+            color: 0xffffff
+        });
+        const videoPlane = new THREE.Mesh(videoGeometry, videoMaterial);
+        videoPlane.position.z = -10; // Push back
+        // Rotate 180 deg on Y to mirror the video? 
+        // Usually webcam is mirrored. Let's check. 
+        // If we want it to act like a mirror, we need to flip it.
+        videoPlane.scale.x = -1;
+        scene.add(videoPlane);
+
+        // =========================================================
+        //  === NEON SIGN (Layer 2) ===
+        // =========================================================
+
+        const loader = new GLTFLoader();
+        let loadedModel = null;
+        let mixer = null;
+
+        loader.load('./model.gltf', function (gltf) {
+            loadedModel = gltf.scene;
+
+            // Center the model
+            const box = new THREE.Box3().setFromObject(loadedModel);
+            const center = box.getCenter(new THREE.Vector3());
+            loadedModel.position.sub(center); // Center at 0,0,0
+
+            // Initial Scale
+            loadedModel.scale.set(MODEL_SCALE_BASE, MODEL_SCALE_BASE, MODEL_SCALE_BASE);
+
+            scene.add(loadedModel);
+            statusText.innerText = "Active";
+
+            if (gltf.animations && gltf.animations.length) {
+                mixer = new THREE.AnimationMixer(loadedModel);
+                gltf.animations.forEach((clip) => {
+                    mixer.clipAction(clip).play();
+                });
+            }
+
+        }, undefined, function (error) {
+            console.error(error);
+            statusText.innerText = "Error loading model";
+        });
+
+        // =========================================================
+        //  === LIGHTING ===
+        // =========================================================
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+        scene.add(ambientLight);
+
+        // Point Light (Red) - Affects both neon sign and video
+        const pointLight = new THREE.PointLight(0xff0000, 5, 50);
+        pointLight.position.set(0, 0, 2); // In front of the model
+        scene.add(pointLight);
+
+        // =========================================================
+        //  === POST-PROCESSING (Bloom) ===
+        // =========================================================
+
+        const renderScene = new RenderPass(scene, camera);
+
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 1.5, 0.4, 0.85);
+        bloomPass.threshold = BLOOM_THRESHOLD;
+        bloomPass.strength = BLOOM_STRENGTH;
+        bloomPass.radius = BLOOM_RADIUS;
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // =========================================================
+        //  === CAMERA SETUP ===
+        // =========================================================
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                videoElement.srcObject = stream;
+                videoElement.play();
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                statusText.innerText = "Camera Error: " + err.message;
+            }
+        }
+        startCamera();
+
+        // =========================================================
+        //  === RESIZE HANDLER ===
+        // =========================================================
+
+        function handleResize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+
+            // Update Video Plane Scale to Cover Screen
+            if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                const videoAspect = videoElement.videoWidth / videoElement.videoHeight;
+                const screenAspect = width / height;
+
+                // Calculate visible height at videoPlane depth
+                const distance = camera.position.z - videoPlane.position.z;
+                const vFOV = THREE.MathUtils.degToRad(camera.fov); // vertical FOV in radians
+                const visibleHeight = 2 * Math.tan(vFOV / 2) * distance;
+                const visibleWidth = visibleHeight * camera.aspect;
+
+                // Scale logic to "cover"
+                // If video is wider than screen (relative to height), scale by height
+                // But we need to fill the visible area.
+
+                // Reset scale
+                videoPlane.scale.set(1, 1, 1);
+
+                // The geometry is 16x9, but we want it to match video aspect
+                // Let's just resize the geometry or scale the mesh to match video aspect first
+                // Actually, let's just make the geometry 1x1 and scale it.
+                // But we already made it 16x9. Let's re-make it or update it?
+                // Simpler: Just scale the mesh.
+
+                // First, make the mesh match the video aspect ratio
+                // Let's assume geometry is 1x1 for simplicity of math
+            }
+        }
+
+        // Better approach for Video Plane:
+        // Replace geometry with 1x1 plane so scaling is easier
+        videoPlane.geometry.dispose();
+        videoPlane.geometry = new THREE.PlaneGeometry(1, 1);
+
+        function updateVideoPlane() {
+            if (videoElement.readyState < videoElement.HAVE_ENOUGH_DATA) return;
+
+            const videoW = videoElement.videoWidth;
+            const videoH = videoElement.videoHeight;
+            const videoAspect = videoW / videoH;
+
+            const screenAspect = width / height;
+
+            const distance = camera.position.z - videoPlane.position.z;
+            const vFOV = THREE.MathUtils.degToRad(camera.fov);
+            const visibleHeight = 2 * Math.tan(vFOV / 2) * distance;
+            const visibleWidth = visibleHeight * camera.aspect;
+
+            let scaleX, scaleY;
+
+            // "Cover" logic
+            if (screenAspect > videoAspect) {
+                // Screen is wider than video -> Fit width
+                scaleX = visibleWidth;
+                scaleY = visibleWidth / videoAspect;
+            } else {
+                // Screen is taller than video -> Fit height
+                scaleY = visibleHeight;
+                scaleX = visibleHeight * videoAspect;
+            }
+
+            videoPlane.scale.set(-scaleX, scaleY, 1); // Negative X to mirror
+        }
+
+        window.addEventListener('resize', () => {
+            handleResize();
+            updateVideoPlane();
+        });
+        videoElement.addEventListener('loadedmetadata', updateVideoPlane);
+
+        // =========================================================
+        //  === ANIMATION LOOP ===
+        // =========================================================
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.001;
+
+            // Breathing Animation
+            if (loadedModel) {
+                const scale = 1.15 + Math.sin(time * 1.0) * 0.05;
+                loadedModel.scale.set(scale, scale, scale);
+
+                loadedModel.rotation.y = Math.sin(time * 0.5) * 0.2;
+                loadedModel.rotation.x = Math.cos(time * 0.3) * 0.1;
+            }
+
+            if (mixer) mixer.update(0.016);
+
+            // Ensure video texture updates
+            // (Three.js does this automatically for VideoTexture usually, but good to know)
+
+            composer.render();
+        }
+        animate();
+
+    </script>
+</body>
+
+</html>
