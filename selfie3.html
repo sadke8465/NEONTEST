@@ -101,10 +101,20 @@
         //  === CONFIGURATION ===
         // =========================================================
 
-        const MODEL_SCALE_BASE = 1.0;
-        const BLOOM_THRESHOLD = 0.8; // High threshold to avoid video blooming
-        const BLOOM_STRENGTH = 1.5;
-        const BLOOM_RADIUS = 0.4;
+        // Positioning (Same as Selfie Mode 1)
+        const MODEL_WIDTH_PCT = 0.9;
+        const ROTATION_FIX_Y = 0.0;
+        const VERTICAL_OFFSET = 0.0;
+        const HORIZONTAL_OFFSET = 0.0;
+
+        // Bloom (Selective)
+        const BLOOM_THRESHOLD = 0.85; // High threshold to exclude video
+        const BLOOM_STRENGTH = 2.0;
+        const BLOOM_RADIUS = 0.5;
+
+        // Colors
+        const NEON_COLOR = 0xEB292D;
+        const NEON_INTENSITY_SCALAR = 10.0; // HDR Multiplier for Bloom
 
         // =========================================================
         //  === SETUP ===
@@ -124,7 +134,7 @@
         const scene = new THREE.Scene();
 
         const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-        camera.position.set(0, 0, 5);
+        camera.position.set(0, 0, 10); // Match Selfie Mode 1 Camera Z
 
         const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true });
         renderer.setSize(width, height);
@@ -133,7 +143,7 @@
         renderer.outputColorSpace = THREE.SRGBColorSpace;
 
         // =========================================================
-        //  === VIDEO BACKGROUND (Layer 1) ===
+        //  === VIDEO BACKGROUND (Layer 1 - Furthest Back) ===
         // =========================================================
 
         const videoTexture = new THREE.VideoTexture(videoElement);
@@ -141,50 +151,56 @@
 
         // Plane for video
         // We will scale this in handleResize to cover the screen
-        const videoGeometry = new THREE.PlaneGeometry(16, 9);
+        const videoGeometry = new THREE.PlaneGeometry(1, 1);
         const videoMaterial = new THREE.MeshStandardMaterial({
             map: videoTexture,
             side: THREE.DoubleSide,
             roughness: 1,
             metalness: 0,
-            color: 0xffffff
+            color: 0xffffff // Base color
         });
         const videoPlane = new THREE.Mesh(videoGeometry, videoMaterial);
         videoPlane.position.z = -10; // Push back
-        // Rotate 180 deg on Y to mirror the video? 
-        // Usually webcam is mirrored. Let's check. 
-        // If we want it to act like a mirror, we need to flip it.
-        videoPlane.scale.x = -1;
         scene.add(videoPlane);
 
         // =========================================================
-        //  === NEON SIGN (Layer 2) ===
+        //  === NEON SIGN (Layer 2 - Front) ===
         // =========================================================
 
         const loader = new GLTFLoader();
         let loadedModel = null;
-        let mixer = null;
+        let pointLight = null;
+
+        // HDR Material for Neon Sign
+        const neonMaterial = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(NEON_COLOR).multiplyScalar(NEON_INTENSITY_SCALAR)
+        });
 
         loader.load('./model.gltf', function (gltf) {
             loadedModel = gltf.scene;
 
-            // Center the model
+            // Apply HDR Material
+            loadedModel.traverse((child) => {
+                if (child.isMesh) child.material = neonMaterial;
+            });
+
+            // Center the model internally
             const box = new THREE.Box3().setFromObject(loadedModel);
             const center = box.getCenter(new THREE.Vector3());
-            loadedModel.position.sub(center); // Center at 0,0,0
+            loadedModel.position.sub(center);
 
-            // Initial Scale
-            loadedModel.scale.set(MODEL_SCALE_BASE, MODEL_SCALE_BASE, MODEL_SCALE_BASE);
+            // Add Point Light (Red) - Affects Video Plane
+            // Positioned at model center
+            pointLight = new THREE.PointLight(NEON_COLOR, 2, 50);
+            pointLight.position.set(0, 0, 2); // Slightly in front of model to light up video behind? 
+            // Wait, if light is at 0,0,2 and video is at -10, light will shine on video.
+            // Model is at roughly 0,0,0 (will be positioned by fitModelToCamera).
+            loadedModel.add(pointLight);
 
             scene.add(loadedModel);
             statusText.innerText = "Active";
 
-            if (gltf.animations && gltf.animations.length) {
-                mixer = new THREE.AnimationMixer(loadedModel);
-                gltf.animations.forEach((clip) => {
-                    mixer.clipAction(clip).play();
-                });
-            }
+            fitModelToCamera();
 
         }, undefined, function (error) {
             console.error(error);
@@ -195,13 +211,9 @@
         //  === LIGHTING ===
         // =========================================================
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+        // Ambient Light (Low) - Ensures video is visible even without point light
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
         scene.add(ambientLight);
-
-        // Point Light (Red) - Affects both neon sign and video
-        const pointLight = new THREE.PointLight(0xff0000, 5, 50);
-        pointLight.position.set(0, 0, 2); // In front of the model
-        scene.add(pointLight);
 
         // =========================================================
         //  === POST-PROCESSING (Bloom) ===
@@ -241,51 +253,55 @@
         startCamera();
 
         // =========================================================
-        //  === RESIZE HANDLER ===
+        //  === POSITIONING LOGIC (From Selfie Mode 1) ===
         // =========================================================
 
-        function handleResize() {
-            width = window.innerWidth;
-            height = window.innerHeight;
+        function fitModelToCamera() {
+            if (!loadedModel) return;
 
-            camera.aspect = width / height;
-            camera.updateProjectionMatrix();
-            renderer.setSize(width, height);
-            composer.setSize(width, height);
+            // 1. Reset to get un-transformed bounds
+            loadedModel.rotation.set(0, 0, 0);
+            loadedModel.scale.set(1, 1, 1);
+            loadedModel.position.set(0, 0, 0);
+            loadedModel.updateMatrixWorld(true);
 
-            // Update Video Plane Scale to Cover Screen
-            if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
-                const videoAspect = videoElement.videoWidth / videoElement.videoHeight;
-                const screenAspect = width / height;
+            // 2. Camera Frustum at Z=0
+            const dist = camera.position.z;
+            const vFOV = THREE.MathUtils.degToRad(camera.fov);
+            const visibleHeight = 2 * Math.tan(vFOV / 2) * dist;
+            const visibleWidth = visibleHeight * camera.aspect;
 
-                // Calculate visible height at videoPlane depth
-                const distance = camera.position.z - videoPlane.position.z;
-                const vFOV = THREE.MathUtils.degToRad(camera.fov); // vertical FOV in radians
-                const visibleHeight = 2 * Math.tan(vFOV / 2) * distance;
-                const visibleWidth = visibleHeight * camera.aspect;
+            // 3. Measure Model
+            const box = new THREE.Box3().setFromObject(loadedModel);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const center = new THREE.Vector3();
+            box.getCenter(center);
 
-                // Scale logic to "cover"
-                // If video is wider than screen (relative to height), scale by height
-                // But we need to fill the visible area.
+            // 4. Scale to Match Width
+            let scaleFactor = (visibleWidth / size.x) * MODEL_WIDTH_PCT;
+            loadedModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
-                // Reset scale
-                videoPlane.scale.set(1, 1, 1);
+            // 5. Position Logic
 
-                // The geometry is 16x9, but we want it to match video aspect
-                // Let's just resize the geometry or scale the mesh to match video aspect first
-                // Actually, let's just make the geometry 1x1 and scale it.
-                // But we already made it 16x9. Let's re-make it or update it?
-                // Simpler: Just scale the mesh.
+            // A. Align Front Face to Z=0
+            const scaledMaxZ = box.max.z * scaleFactor;
+            loadedModel.position.z = -scaledMaxZ;
 
-                // First, make the mesh match the video aspect ratio
-                // Let's assume geometry is 1x1 for simplicity of math
-            }
+            // B. Align Top to Top of Screen with Padding
+            const scaledTopY = box.max.y * scaleFactor;
+            const targetTopY = visibleHeight / 2;
+            const topPadding = visibleHeight * 0.05;
+
+            loadedModel.position.y = (targetTopY - scaledTopY - topPadding) + VERTICAL_OFFSET;
+
+            // C. Center Horizontally
+            const scaledCenterX = center.x * scaleFactor;
+            loadedModel.position.x = -scaledCenterX + HORIZONTAL_OFFSET;
+
+            // 6. Apply Rotation
+            loadedModel.rotation.y = ROTATION_FIX_Y;
         }
-
-        // Better approach for Video Plane:
-        // Replace geometry with 1x1 plane so scaling is easier
-        videoPlane.geometry.dispose();
-        videoPlane.geometry = new THREE.PlaneGeometry(1, 1);
 
         function updateVideoPlane() {
             if (videoElement.readyState < videoElement.HAVE_ENOUGH_DATA) return;
@@ -317,10 +333,24 @@
             videoPlane.scale.set(-scaleX, scaleY, 1); // Negative X to mirror
         }
 
-        window.addEventListener('resize', () => {
-            handleResize();
+        // =========================================================
+        //  === RESIZE HANDLER ===
+        // =========================================================
+
+        function handleResize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+
+            fitModelToCamera();
             updateVideoPlane();
-        });
+        }
+
+        window.addEventListener('resize', handleResize);
         videoElement.addEventListener('loadedmetadata', updateVideoPlane);
 
         // =========================================================
@@ -330,21 +360,23 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            const time = Date.now() * 0.001;
+            const time = Date.now() * 0.005;
 
-            // Breathing Animation
-            if (loadedModel) {
-                const scale = 1.15 + Math.sin(time * 1.0) * 0.05;
-                loadedModel.scale.set(scale, scale, scale);
+            // Neon Flicker Effect (From Selfie Mode 1)
+            const flicker = Math.random() > 0.9 ? Math.random() * 0.5 : 0;
+            const pulse = Math.sin(time * 2) * 0.1;
 
-                loadedModel.rotation.y = Math.sin(time * 0.5) * 0.2;
-                loadedModel.rotation.x = Math.cos(time * 0.3) * 0.1;
+            // Apply to Bloom
+            bloomPass.strength = 2.0 + pulse + flicker;
+
+            // Apply to Light
+            if (pointLight) {
+                // Base intensity 2.0, plus flicker
+                pointLight.intensity = 2.0 + (pulse * 2) + (flicker * 3);
             }
 
-            if (mixer) mixer.update(0.016);
-
             // Ensure video texture updates
-            // (Three.js does this automatically for VideoTexture usually, but good to know)
+            updateVideoPlane(); // Keep checking in case of resize/orientation change
 
             composer.render();
         }
