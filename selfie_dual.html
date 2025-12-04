@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DUAL SELFIE MODE</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: monospace;
+        }
+
+        #container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        /* Layer 1: Clean Camera Feed (Furthest Back) */
+        #camera_feed_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            object-fit: cover;
+        }
+
+        /* Layer 2: Back Model (Behind User - with transitions) */
+        #back_model_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+            /* Starts off-screen below */
+            transform: translateY(100%);
+            transition: transform 0.8s cubic-bezier(0.85, 0, 0.15, 1);
+        }
+
+        #back_model_canvas.active {
+            transform: translateY(0);
+        }
+
+        /* Layer 3: Segmented User (Middle) */
+        .output_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+        }
+
+        /* Layer 4: Neon Scene (Front - with transitions) */
+        #neon_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            pointer-events: none;
+            /* Starts in view */
+            transform: translateY(0);
+            transition: transform 0.8s cubic-bezier(0.85, 0, 0.15, 1);
+        }
+
+        #neon_canvas.hidden {
+            transform: translateY(-100%);
+        }
+
+        .input_video {
+            display: none;
+        }
+
+        #status {
+            position: absolute;
+            color: cyan;
+            z-index: 5;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 12px;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        #back_btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 5;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            border: 1px solid white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-family: sans-serif;
+            text-transform: uppercase;
+            font-size: 12px;
+            backdrop-filter: blur(4px);
+            pointer-events: all;
+        }
+
+        #mode_indicator {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            background: rgba(0, 0, 0, 0.7);
+            color: #00ffff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-family: sans-serif;
+            font-size: 14px;
+            pointer-events: none;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"
+        crossorigin="anonymous"></script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+
+    <div id="container">
+        <div id="status">Loading System...</div>
+        <a href="index.html" id="back_btn">Back</a>
+        <div id="mode_indicator">Tap to toggle mode</div>
+
+        <!-- Layer 1: Clean Camera Feed -->
+        <canvas id="camera_feed_canvas"></canvas>
+
+        <!-- Layer 2: Back Model (behind user) -->
+        <canvas id="back_model_canvas"></canvas>
+
+        <!-- Layer 3: Segmented User -->
+        <canvas class="output_canvas"></canvas>
+
+        <!-- Layer 4: Neon Scene (in front of user) -->
+        <canvas id="neon_canvas"></canvas>
+    </div>
+    <video class="input_video" autoplay playsinline></video>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+        // =========================================================
+        //  === CONFIGURATION ===
+        // =========================================================
+
+        // Segmentation Quality
+        const MASK_BLUR_PX = 3;
+        const MASK_SMOOTHING_ALPHA = 0.35;
+
+        // Neon Model Settings
+        let MODEL_WIDTH_PCT = 0.9;
+        let ROTATION_FIX_Y = 0.0;
+        let VERTICAL_OFFSET = 0.0;
+        let HORIZONTAL_OFFSET = 0.0;
+
+        // Back Model Settings
+        const BACK_MODEL_SCALE_BASE = 1.0;
+
+        // Mode State
+        let isNeonMode = true; // Start with neon (mode 3)
+
+        // =========================================================
+        //  === SETUP ===
+        // =========================================================
+
+        const container = document.getElementById('container');
+        const cameraFeedCanvas = document.getElementById('camera_feed_canvas');
+        const cameraFeedCtx = cameraFeedCanvas.getContext('2d');
+
+        const backModelCanvas = document.getElementById('back_model_canvas');
+        const neonCanvas = document.getElementById('neon_canvas');
+
+        const outputCanvas = document.querySelector('.output_canvas');
+        const outputCtx = outputCanvas.getContext('2d');
+
+        const statusText = document.getElementById('status');
+        const modeIndicator = document.getElementById('mode_indicator');
+        const videoElement = document.querySelector('.input_video');
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+
+        // =========================================================
+        //  === NEON SCENE (Layer 4 - Front) ===
+        // =========================================================
+
+        const neonScene = new THREE.Scene();
+        neonScene.background = null; // Transparent
+
+        const neonCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+        neonCamera.position.set(0, 0, 10);
+
+        const neonRenderer = new THREE.WebGLRenderer({ canvas: neonCanvas, alpha: true, antialias: true });
+        neonRenderer.setSize(width, height);
+        neonRenderer.setPixelRatio(window.devicePixelRatio);
+
+        const textureLoader = new THREE.TextureLoader();
+        let neonModel = null;
+        let neonPointLight = null;
+
+        // Background Plane for Neon Scene
+        const bgGeometry = new THREE.PlaneGeometry(40, 40, 128, 128);
+        const bgDiffuse = textureLoader.load('./bg_diffuse.png');
+        const bgDisplacement = textureLoader.load('./bg_displacement.png');
+
+        const bgMaterial = new THREE.MeshStandardMaterial({
+            map: bgDiffuse,
+            displacementMap: bgDisplacement,
+            displacementScale: 2.0,
+            color: 0xffffff,
+            roughness: 0.4,
+            metalness: 0.1
+        });
+
+        const bgPlane = new THREE.Mesh(bgGeometry, bgMaterial);
+        bgPlane.position.z = -5;
+        neonScene.add(bgPlane);
+
+        const neonMaterial = new THREE.MeshBasicMaterial({ color: 0xEB292D, wireframe: false });
+
+        function fitNeonModelToCamera() {
+            if (!neonModel) return;
+
+            neonModel.rotation.set(0, 0, 0);
+            neonModel.scale.set(1, 1, 1);
+            neonModel.position.set(0, 0, 0);
+            neonModel.updateMatrixWorld(true);
+
+            const dist = neonCamera.position.z;
+            const vFOV = THREE.MathUtils.degToRad(neonCamera.fov);
+            const visibleHeight = 2 * Math.tan(vFOV / 2) * dist;
+            const visibleWidth = visibleHeight * neonCamera.aspect;
+
+            const box = new THREE.Box3().setFromObject(neonModel);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+
+            let scaleFactor = (visibleWidth / size.x) * MODEL_WIDTH_PCT;
+            neonModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+            const scaledMaxZ = box.max.z * scaleFactor;
+            neonModel.position.z = -scaledMaxZ;
+
+            const scaledTopY = box.max.y * scaleFactor;
+            const targetTopY = visibleHeight / 2;
+            const topPadding = visibleHeight * 0.05;
+
+            neonModel.position.y = (targetTopY - scaledTopY - topPadding) + VERTICAL_OFFSET;
+
+            const scaledCenterX = center.x * scaleFactor;
+            neonModel.position.x = -scaledCenterX + HORIZONTAL_OFFSET;
+
+            neonModel.rotation.y = ROTATION_FIX_Y;
+        }
+
+        const loader = new GLTFLoader();
+        loader.load('./model.gltf', function (gltf) {
+            neonModel = gltf.scene;
+
+            neonModel.traverse((child) => {
+                if (child.isMesh) child.material = neonMaterial;
+            });
+
+            neonPointLight = new THREE.PointLight(0xEB292D, 2, 20);
+            neonPointLight.position.set(0, 5, 0);
+            neonModel.add(neonPointLight);
+
+            neonScene.add(neonModel);
+            fitNeonModelToCamera();
+
+        }, undefined, function (error) {
+            console.error(error);
+            statusText.innerText = "Error loading neon model";
+        });
+
+        // Bloom for Neon
+        const neonRenderScene = new RenderPass(neonScene, neonCamera);
+        const neonBloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 1.5, 0.4, 0.85);
+        neonBloomPass.threshold = 0;
+        neonBloomPass.strength = 2.0;
+        neonBloomPass.radius = 0.5;
+
+        const neonComposer = new EffectComposer(neonRenderer);
+        neonComposer.addPass(neonRenderScene);
+        neonComposer.addPass(neonBloomPass);
+
+        // =========================================================
+        //  === BACK MODEL SCENE (Layer 2 - Behind User) ===
+        // =========================================================
+
+        const backScene = new THREE.Scene();
+        backScene.background = null; // Transparent
+
+        const backCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+        backCamera.position.set(0, 0, 5);
+
+        const backRenderer = new THREE.WebGLRenderer({ canvas: backModelCanvas, alpha: true, antialias: true });
+        backRenderer.setSize(width, height);
+        backRenderer.setPixelRatio(window.devicePixelRatio);
+        backRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+        backRenderer.outputColorSpace = THREE.SRGBColorSpace;
+
+        // Global Illumination
+        const pmremGenerator = new THREE.PMREMGenerator(backRenderer);
+        backScene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        backScene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        dirLight.position.set(2, 5, 5);
+        backScene.add(dirLight);
+
+        let backModel = null;
+        let backMixer = null;
+
+        loader.load('./back_model.glb', function (gltf) {
+            backModel = gltf.scene;
+
+            const box = new THREE.Box3().setFromObject(backModel);
+            const center = box.getCenter(new THREE.Vector3());
+            backModel.position.sub(center);
+
+            backModel.scale.set(BACK_MODEL_SCALE_BASE, BACK_MODEL_SCALE_BASE, BACK_MODEL_SCALE_BASE);
+
+            backScene.add(backModel);
+            statusText.innerText = "System Active";
+
+            if (gltf.animations && gltf.animations.length) {
+                backMixer = new THREE.AnimationMixer(backModel);
+                gltf.animations.forEach((clip) => {
+                    backMixer.clipAction(clip).play();
+                });
+            }
+
+        }, undefined, function (error) {
+            console.error(error);
+            statusText.innerText = "Error loading back model";
+        });
+
+        // =========================================================
+        //  === TEMPORAL SMOOTHING HELPERS ===
+        // =========================================================
+
+        let offscreenCanvas = null;
+        let offscreenCtx = null;
+        let previousMaskData = null;
+        let currentMaskData = null;
+
+        function initTemporalSmoothing(w, h) {
+            offscreenCanvas = document.createElement('canvas');
+            offscreenCanvas.width = w;
+            offscreenCanvas.height = h;
+            offscreenCtx = offscreenCanvas.getContext('2d');
+            previousMaskData = null;
+            currentMaskData = null;
+        }
+
+        // =========================================================
+        //  === RESIZE HANDLER ===
+        // =========================================================
+
+        function handleResize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+
+            // Update Neon Scene
+            neonCamera.aspect = width / height;
+            neonCamera.updateProjectionMatrix();
+            neonRenderer.setSize(width, height);
+            neonComposer.setSize(width, height);
+            neonBloomPass.resolution.set(width, height);
+            fitNeonModelToCamera();
+
+            // Update Back Model Scene
+            backCamera.aspect = width / height;
+            backCamera.updateProjectionMatrix();
+            backRenderer.setSize(width, height);
+
+            // Update Canvases
+            cameraFeedCanvas.width = width;
+            cameraFeedCanvas.height = height;
+
+            outputCanvas.width = width;
+            outputCanvas.height = height;
+
+            initTemporalSmoothing(width, height);
+        }
+
+        window.addEventListener('resize', handleResize);
+        handleResize();
+
+        // =========================================================
+        //  === TAP TO TOGGLE MODE ===
+        // =========================================================
+
+        container.addEventListener('click', () => {
+            isNeonMode = !isNeonMode;
+
+            if (isNeonMode) {
+                // Show neon, hide back model
+                neonCanvas.classList.remove('hidden');
+                backModelCanvas.classList.remove('active');
+                modeIndicator.innerText = 'Mode: Neon Front';
+            } else {
+                // Hide neon, show back model
+                neonCanvas.classList.add('hidden');
+                backModelCanvas.classList.add('active');
+                modeIndicator.innerText = 'Mode: Back Model';
+            }
+        });
+
+        // =========================================================
+        //  === ANIMATION LOOP ===
+        // =========================================================
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.001;
+
+            // Neon Scene Animation
+            if (neonModel && neonPointLight) {
+                const flicker = Math.random() > 0.9 ? Math.random() * 0.5 : 0;
+                const pulse = Math.sin(time * 2) * 0.1;
+
+                neonBloomPass.strength = 2.0 + pulse + flicker;
+                neonPointLight.intensity = 2.0 + (pulse * 2) + (flicker * 3);
+            }
+
+            // Back Model Breathing Animation
+            if (backModel) {
+                const scale = 1.15 + Math.sin(time * 1.0) * 0.05;
+                backModel.scale.set(scale, scale, scale);
+
+                backModel.rotation.y = Math.sin(time * 0.5) * 0.2;
+                backModel.rotation.x = Math.cos(time * 0.3) * 0.1;
+            }
+
+            if (backMixer) backMixer.update(0.016);
+
+            // Render both scenes
+            neonComposer.render();
+            backRenderer.render(backScene, backCamera);
+        }
+        animate();
+
+        // =========================================================
+        //  === MEDIAPIPE RESULTS ===
+        // =========================================================
+
+        function onResults(results) {
+            const img = results.image;
+            const imgRatio = img.width / img.height;
+            const canvasRatio = outputCanvas.width / outputCanvas.height;
+
+            let drawWidth, drawHeight;
+            if (imgRatio > canvasRatio) {
+                drawHeight = outputCanvas.height;
+                drawWidth = drawHeight * imgRatio;
+            } else {
+                drawWidth = outputCanvas.width;
+                drawHeight = drawWidth / imgRatio;
+            }
+
+            const x = (outputCanvas.width - drawWidth) / 2;
+            const y = (outputCanvas.height - drawHeight) / 2;
+
+            // -----------------------------------------------------
+            // LAYER 1: CLEAN CAMERA FEED (Background)
+            // -----------------------------------------------------
+            cameraFeedCtx.save();
+            cameraFeedCtx.clearRect(0, 0, cameraFeedCanvas.width, cameraFeedCanvas.height);
+            cameraFeedCtx.translate(cameraFeedCanvas.width, 0);
+            cameraFeedCtx.scale(-1, 1);
+            cameraFeedCtx.drawImage(results.image, x, y, drawWidth, drawHeight);
+            cameraFeedCtx.restore();
+
+            // -----------------------------------------------------
+            // LAYER 3: SEGMENTED USER (Foreground)
+            // -----------------------------------------------------
+            outputCtx.save();
+            outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+
+            outputCtx.translate(outputCanvas.width, 0);
+            outputCtx.scale(-1, 1);
+
+            // Temporal Smoothing
+            if (!offscreenCanvas) initTemporalSmoothing(drawWidth, drawHeight);
+            if (offscreenCanvas.width !== drawWidth || offscreenCanvas.height !== drawHeight) {
+                offscreenCanvas.width = drawWidth;
+                offscreenCanvas.height = drawHeight;
+                previousMaskData = null;
+            }
+
+            offscreenCtx.clearRect(0, 0, drawWidth, drawHeight);
+            offscreenCtx.drawImage(results.segmentationMask, 0, 0, drawWidth, drawHeight);
+            currentMaskData = offscreenCtx.getImageData(0, 0, drawWidth, drawHeight);
+
+            if (previousMaskData && previousMaskData.width === currentMaskData.width) {
+                const current = currentMaskData.data;
+                const previous = previousMaskData.data;
+                for (let i = 0; i < current.length; i += 4) {
+                    const alpha = MASK_SMOOTHING_ALPHA;
+                    current[i] = alpha * current[i] + (1 - alpha) * previous[i];
+                    current[i + 1] = alpha * current[i + 1] + (1 - alpha) * previous[i + 1];
+                    current[i + 2] = alpha * current[i + 2] + (1 - alpha) * previous[i + 2];
+                    current[i + 3] = alpha * current[i + 3] + (1 - alpha) * previous[i + 3];
+                }
+            }
+
+            previousMaskData = new ImageData(new Uint8ClampedArray(currentMaskData.data), drawWidth, drawHeight);
+            offscreenCtx.putImageData(currentMaskData, 0, 0);
+
+            // Draw Segmented User
+            outputCtx.filter = `blur(${MASK_BLUR_PX}px)`;
+            outputCtx.drawImage(offscreenCanvas, x, y, drawWidth, drawHeight);
+            outputCtx.filter = 'none';
+
+            outputCtx.globalCompositeOperation = 'source-in';
+            outputCtx.drawImage(results.image, x, y, drawWidth, drawHeight);
+
+            outputCtx.globalCompositeOperation = 'source-over';
+            outputCtx.restore();
+        }
+
+        // =========================================================
+        //  === MEDIAPIPE INIT ===
+        // =========================================================
+
+        const selfieSegmentation = new SelfieSegmentation({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+        });
+
+        selfieSegmentation.setOptions({
+            modelSelection: 1,
+            selfieMode: true
+        });
+
+        selfieSegmentation.onResults(onResults);
+
+        // =========================================================
+        //  === CAMERA INITIALIZATION ===
+        // =========================================================
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                });
+
+                videoElement.srcObject = stream;
+                await videoElement.play();
+
+                statusText.innerText = "System Active";
+
+                async function processFrame() {
+                    if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                        await selfieSegmentation.send({ image: videoElement });
+                    }
+                    requestAnimationFrame(processFrame);
+                }
+
+                processFrame();
+
+            } catch (e) {
+                console.error("Camera Error:", e);
+                statusText.innerText = `Camera Error: ${e.message || 'Access Denied'}`;
+                alert(`Cannot access camera: ${e.message || 'Please grant camera permissions and ensure you are using HTTPS'}`);
+            }
+        }
+
+        startCamera();
+    </script>
+</body>
+
+</html>
