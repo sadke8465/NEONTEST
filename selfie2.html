@@ -399,6 +399,7 @@
 
         const mpCamera = new Camera(videoElement, {
             onFrame: async () => { await selfieSegmentation.send({ image: videoElement }); },
+            facingMode: 'user',
             width: 1280,
             height: 720
         });
