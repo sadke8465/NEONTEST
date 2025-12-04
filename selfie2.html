@@ -183,9 +183,9 @@
         // =========================================================
 
         // Segmentation Quality
-        const MASK_BLUR_PX = 8; // Increased for softer edges (feathering)
-        const MASK_SMOOTHING_ALPHA = 0.15; // Lower = More smoothing (less jitter)
-        const MASK_HARDENING_ITERATIONS = 1; // Reduced to keep some feathering while maintaining edge definition
+        const MASK_BLUR_PX = 1; // Tight feathering only
+        const MASK_SMOOTHING_ALPHA = 0.2; // Temporal smoothing
+        const MASK_EROSION_THRESHOLD = 0.65; // Alpha threshold for erosion (anti-halo)
 
         // Model Settings
         const MODEL_SCALE_BASE = 1.0;
@@ -240,6 +240,10 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
         dirLight.position.set(2, 5, 5);
         scene.add(dirLight);
+
+        const pointLight = new THREE.PointLight(0xffffff, 10, 100);
+        pointLight.position.set(0, 2, 3);
+        scene.add(pointLight);
 
         // Load Model
         const loader = new GLTFLoader();
@@ -384,9 +388,6 @@
             // -----------------------------------------------------
             cameraFeedCtx.save();
             cameraFeedCtx.clearRect(0, 0, cameraFeedCanvas.width, cameraFeedCanvas.height);
-            // Mirror (Removed to flip)
-            // cameraFeedCtx.translate(cameraFeedCanvas.width, 0);
-            // cameraFeedCtx.scale(-1, 1);
             cameraFeedCtx.drawImage(results.image, x, y, drawWidth, drawHeight);
             cameraFeedCtx.restore();
 
@@ -396,44 +397,50 @@
             outputCtx.save();
             outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
 
-            // --- Temporal Smoothing (GPU) ---
+            // --- Initialize Canvases ---
             if (!maskAccumulatorCanvas) initTemporalSmoothing(drawWidth, drawHeight);
-
-            // Resize check
             if (maskAccumulatorCanvas.width !== drawWidth || maskAccumulatorCanvas.height !== drawHeight) {
                 initTemporalSmoothing(drawWidth, drawHeight);
             }
 
-            // 1. Accumulate Mask (Temporal Smoothing)
-            // Blend New Mask into Accumulator
+            // === STEP 1: Temporal Smoothing (GPU) ===
             maskAccumulatorCtx.globalCompositeOperation = 'source-over';
-            // If first frame, use alpha 1.0 to fill immediately, otherwise blend
             maskAccumulatorCtx.globalAlpha = isFirstFrame ? 1.0 : MASK_SMOOTHING_ALPHA;
             maskAccumulatorCtx.drawImage(results.segmentationMask, 0, 0, drawWidth, drawHeight);
             maskAccumulatorCtx.globalAlpha = 1.0;
             isFirstFrame = false;
 
-            // 2. Process Mask (Blur + Harden)
-            // Clear scratch canvas
-            offscreenCtx.clearRect(0, 0, drawWidth, drawHeight);
+            // === STEP 2: Erosion (Threshold Alpha) ===
+            // Get mask pixel data
+            const maskData = maskAccumulatorCtx.getImageData(0, 0, drawWidth, drawHeight);
+            const pixels = maskData.data;
 
-            // Draw Accumulator to Scratch with Blur
+            // Apply threshold: alpha < 0.65 becomes 0 (cut halo)
+            for (let i = 0; i < pixels.length; i += 4) {
+                const alpha = pixels[i + 3] / 255; // Normalize to 0-1
+                if (alpha < MASK_EROSION_THRESHOLD) {
+                    pixels[i + 3] = 0; // Make transparent
+                } else {
+                    // Keep original alpha for solid areas
+                    // Optional: boost solid areas slightly
+                    pixels[i + 3] = Math.min(255, pixels[i + 3] * 1.1);
+                }
+            }
+
+            // Put thresholded data back
+            maskAccumulatorCtx.putImageData(maskData, 0, 0);
+
+            // === STEP 3: Minimal Feathering (1px blur) ===
+            offscreenCtx.clearRect(0, 0, drawWidth, drawHeight);
             offscreenCtx.filter = `blur(${MASK_BLUR_PX}px)`;
             offscreenCtx.drawImage(maskAccumulatorCanvas, 0, 0, drawWidth, drawHeight);
             offscreenCtx.filter = 'none';
 
-            // Harden Edges (Draw onto itself to boost alpha/contrast)
-            offscreenCtx.globalCompositeOperation = 'source-over';
-            for (let i = 0; i < MASK_HARDENING_ITERATIONS; i++) {
-                offscreenCtx.drawImage(offscreenCanvas, 0, 0);
-            }
-            // Optional: Use source-in to tighten if needed, but source-over boosting is usually safer for "smoky" edges
-
-            // 3. Final Composite
-            // Draw the processed mask to output
+            // === STEP 4: Final Composite ===
+            // Draw processed mask
             outputCtx.drawImage(offscreenCanvas, x, y, drawWidth, drawHeight);
 
-            // Source-In the video content
+            // Composite video using mask
             outputCtx.globalCompositeOperation = 'source-in';
             outputCtx.drawImage(results.image, x, y, drawWidth, drawHeight);
 
