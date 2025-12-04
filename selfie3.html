@@ -96,6 +96,20 @@
             background: rgba(0, 255, 255, 0.3);
             box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
         }
+
+        /* Transition Overlay */
+        #transition_overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            z-index: 9999;
+            opacity: 1;
+            pointer-events: all;
+            transition: opacity 0.5s ease;
+        }
     </style>
 
     <script type="importmap">
@@ -111,6 +125,7 @@
 <body>
 
     <div id="container">
+        <div id="transition_overlay"></div>
         <div id="status">Initializing...</div>
         <a href="index.html" id="back_btn">Back</a>
         <div id="switch_btn">SWITCH EFFECT</div>
@@ -293,11 +308,48 @@
         const urlParams = new URLSearchParams(window.location.search);
         const isSwitchMode = urlParams.get('switch_mode') === 'true';
         const switchBtn = document.getElementById('switch_btn');
+        const transitionOverlay = document.getElementById('transition_overlay');
 
+        // Initial State
         if (isSwitchMode) {
             switchBtn.style.display = 'block';
+            // Overlay starts at opacity: 1 (from CSS)
+        } else {
+            // Not in switch mode, hide overlay immediately
+            transitionOverlay.style.display = 'none';
+        }
+
+        // Fade In Logic (When Ready)
+        function checkReady() {
+            // We consider it ready when model is loaded and camera is active
+            if (loadedModel && videoElement.readyState >= videoElement.HAVE_ENOUGH_DATA) {
+                if (isSwitchMode) {
+                    setTimeout(() => {
+                        transitionOverlay.style.opacity = '0';
+                        setTimeout(() => {
+                            transitionOverlay.style.pointerEvents = 'none';
+                        }, 500);
+                    }, 100);
+                }
+            } else {
+                requestAnimationFrame(checkReady);
+            }
+        }
+
+        if (isSwitchMode) {
+            checkReady();
+        }
+
+        if (isSwitchMode) {
             switchBtn.addEventListener('click', () => {
-                window.location.href = 'selfie2.html?switch_mode=true';
+                // Fade Out
+                transitionOverlay.style.pointerEvents = 'all';
+                transitionOverlay.style.opacity = '1';
+
+                // Wait for transition then navigate
+                setTimeout(() => {
+                    window.location.href = 'selfie2.html?switch_mode=true';
+                }, 500);
             });
         }
 
