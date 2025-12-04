@@ -197,6 +197,15 @@
         let VERTICAL_OFFSET = 0.0;
         let HORIZONTAL_OFFSET = 0.0;
 
+        // Bloom (Selective)
+        const BLOOM_THRESHOLD = 1.5;
+        const BLOOM_STRENGTH = 2.0;
+        const BLOOM_RADIUS = 0.5;
+
+        // Colors
+        const NEON_COLOR = 0xEB292D;
+        const NEON_INTENSITY_SCALAR = 10.0;
+
         // Back Model Settings
         const BACK_MODEL_SCALE_BASE = 1.0;
 
@@ -237,6 +246,8 @@
         const neonRenderer = new THREE.WebGLRenderer({ canvas: neonCanvas, alpha: true, antialias: true });
         neonRenderer.setSize(width, height);
         neonRenderer.setPixelRatio(window.devicePixelRatio);
+        neonRenderer.toneMapping = THREE.NoToneMapping;
+        neonRenderer.outputColorSpace = THREE.SRGBColorSpace;
 
 
         let neonModel = null;
@@ -244,7 +255,9 @@
 
 
 
-        const neonMaterial = new THREE.MeshBasicMaterial({ color: 0xEB292D, wireframe: false });
+        const neonMaterial = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(NEON_COLOR).multiplyScalar(NEON_INTENSITY_SCALAR)
+        });
 
         function fitNeonModelToCamera() {
             if (!neonModel) return;
@@ -291,8 +304,8 @@
                 if (child.isMesh) child.material = neonMaterial;
             });
 
-            neonPointLight = new THREE.PointLight(0xEB292D, 2, 20);
-            neonPointLight.position.set(0, 5, 0);
+            neonPointLight = new THREE.PointLight(NEON_COLOR, 100, 50);
+            neonPointLight.position.set(0, 0, 2);
             neonModel.add(neonPointLight);
 
             neonScene.add(neonModel);
@@ -306,9 +319,9 @@
         // Bloom for Neon
         const neonRenderScene = new RenderPass(neonScene, neonCamera);
         const neonBloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 1.5, 0.4, 0.85);
-        neonBloomPass.threshold = 0;
-        neonBloomPass.strength = 2.0;
-        neonBloomPass.radius = 0.5;
+        neonBloomPass.threshold = BLOOM_THRESHOLD;
+        neonBloomPass.strength = BLOOM_STRENGTH;
+        neonBloomPass.radius = BLOOM_RADIUS;
 
         const neonComposer = new EffectComposer(neonRenderer);
         neonComposer.addPass(neonRenderScene);
@@ -455,7 +468,7 @@
                 const pulse = Math.sin(time * 2) * 0.1;
 
                 neonBloomPass.strength = 2.0 + pulse + flicker;
-                neonPointLight.intensity = 2.0 + (pulse * 2) + (flicker * 3);
+                neonPointLight.intensity = 100.0 + (pulse * 20) + (flicker * 30);
             }
 
             // Back Model Breathing Animation
