@@ -249,6 +249,25 @@
         neonRenderer.toneMapping = THREE.NoToneMapping;
         neonRenderer.outputColorSpace = THREE.SRGBColorSpace;
 
+        // =========================================================
+        //  === VIDEO BACKGROUND (Layer 1 - Furthest Back) ===
+        // =========================================================
+
+        const videoTexture = new THREE.VideoTexture(videoElement);
+        videoTexture.colorSpace = THREE.SRGBColorSpace;
+
+        const videoGeometry = new THREE.PlaneGeometry(1, 1);
+        const videoMaterial = new THREE.MeshStandardMaterial({
+            map: videoTexture,
+            side: THREE.DoubleSide,
+            roughness: 1,
+            metalness: 0,
+            color: 0xffffff
+        });
+        const videoPlane = new THREE.Mesh(videoGeometry, videoMaterial);
+        videoPlane.position.z = -10;
+        neonScene.add(videoPlane);
+
 
         let neonModel = null;
         let neonPointLight = null;
@@ -294,6 +313,36 @@
             neonModel.position.x = -scaledCenterX + HORIZONTAL_OFFSET;
 
             neonModel.rotation.y = ROTATION_FIX_Y;
+        }
+
+        function updateVideoPlane() {
+            if (videoElement.readyState < videoElement.HAVE_ENOUGH_DATA) return;
+
+            const videoW = videoElement.videoWidth;
+            const videoH = videoElement.videoHeight;
+            const videoAspect = videoW / videoH;
+
+            const screenAspect = width / height;
+
+            const distance = neonCamera.position.z - videoPlane.position.z;
+            const vFOV = THREE.MathUtils.degToRad(neonCamera.fov);
+            const visibleHeight = 2 * Math.tan(vFOV / 2) * distance;
+            const visibleWidth = visibleHeight * neonCamera.aspect;
+
+            let scaleX, scaleY;
+
+            // "Cover" logic
+            if (screenAspect > videoAspect) {
+                // Screen is wider than video -> Fit width
+                scaleX = visibleWidth;
+                scaleY = visibleWidth / videoAspect;
+            } else {
+                // Screen is taller than video -> Fit height
+                scaleY = visibleHeight;
+                scaleX = visibleHeight * videoAspect;
+            }
+
+            videoPlane.scale.set(-scaleX, scaleY, 1); // Negative X to mirror
         }
 
         const loader = new GLTFLoader();
@@ -414,6 +463,7 @@
             neonComposer.setSize(width, height);
             neonBloomPass.resolution.set(width, height);
             fitNeonModelToCamera();
+            updateVideoPlane();
 
             // Update Back Model Scene
             backCamera.aspect = width / height;
@@ -431,6 +481,7 @@
         }
 
         window.addEventListener('resize', handleResize);
+        videoElement.addEventListener('loadedmetadata', updateVideoPlane);
         handleResize();
 
         // =========================================================
@@ -470,6 +521,8 @@
                 neonBloomPass.strength = 2.0 + pulse + flicker;
                 neonPointLight.intensity = 100.0 + (pulse * 20) + (flicker * 30);
             }
+
+            updateVideoPlane();
 
             // Back Model Breathing Animation
             if (backModel) {
