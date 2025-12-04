@@ -367,9 +367,9 @@
             // -----------------------------------------------------
             cameraFeedCtx.save();
             cameraFeedCtx.clearRect(0, 0, cameraFeedCanvas.width, cameraFeedCanvas.height);
-            // Mirror
-            cameraFeedCtx.translate(cameraFeedCanvas.width, 0);
-            cameraFeedCtx.scale(-1, 1);
+            // Mirror (Removed to flip)
+            // cameraFeedCtx.translate(cameraFeedCanvas.width, 0);
+            // cameraFeedCtx.scale(-1, 1);
             cameraFeedCtx.drawImage(results.image, x, y, drawWidth, drawHeight);
             cameraFeedCtx.restore();
 
@@ -379,9 +379,9 @@
             outputCtx.save();
             outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
 
-            // Mirror
-            outputCtx.translate(outputCanvas.width, 0);
-            outputCtx.scale(-1, 1);
+            // Mirror (Removed to flip)
+            // outputCtx.translate(outputCanvas.width, 0);
+            // outputCtx.scale(-1, 1);
 
             // --- Temporal Smoothing ---
             if (!offscreenCanvas) initTemporalSmoothing(drawWidth, drawHeight);
@@ -508,19 +508,19 @@
             // But for simplicity, let's just wait for the model load callback or a short timeout if no model
             // In this file, we have loadedModel.
             if (loadedModel && videoElement.readyState >= videoElement.HAVE_ENOUGH_DATA) {
-                 if (isSwitchMode) {
+                if (isSwitchMode) {
                     setTimeout(() => {
                         transitionOverlay.style.opacity = '0';
                         setTimeout(() => {
                             transitionOverlay.style.pointerEvents = 'none';
                         }, 500);
                     }, 100); // Small delay to ensure render
-                 }
+                }
             } else {
                 requestAnimationFrame(checkReady);
             }
         }
-        
+
         if (isSwitchMode) {
             checkReady();
         }
