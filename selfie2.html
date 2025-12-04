@@ -183,9 +183,9 @@
         // =========================================================
 
         // Segmentation Quality
-        const MASK_BLUR_PX = 4; // Increased slightly for better smoothing before hardening
-        const MASK_SMOOTHING_ALPHA = 0.35; // 0.35 means 35% new, 65% old
-        const MASK_HARDENING_ITERATIONS = 2; // How many times to draw mask over itself to tighten edges
+        const MASK_BLUR_PX = 8; // Increased for softer edges (feathering)
+        const MASK_SMOOTHING_ALPHA = 0.15; // Lower = More smoothing (less jitter)
+        const MASK_HARDENING_ITERATIONS = 1; // Reduced to keep some feathering while maintaining edge definition
 
         // Model Settings
         const MODEL_SCALE_BASE = 1.0;
