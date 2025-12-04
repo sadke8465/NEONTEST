@@ -4,543 +4,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon 3D Background</title>
+    <title>AR Experience</title>
+    <!-- Import model-viewer -->
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
     <style>
         body {
             margin: 0;
             background-color: #000;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            overflow: hidden;
-            font-family: monospace;
-        }
-
-        #container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
             overflow: hidden;
         }
 
-        #bg_canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
+        h1 {
+            color: #00ffff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 40px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            font-size: 24px;
         }
 
-        .output_canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
+        .menu-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
             width: 100%;
-            height: 100%;
-            z-index: 1;
+            max-width: 300px;
+            padding: 20px;
+            z-index: 10;
         }
 
-        .input_video {
+        .btn {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 15px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 30px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            box-sizing: border-box;
+        }
+
+        .btn:hover {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+            border-color: #00ffff;
+            transform: scale(1.02);
+        }
+
+        /* Model Viewer Styling */
+        model-viewer {
+            width: 100%;
+            /* Match button width logic */
+            height: 60px;
+            /* Match button height approx */
+            display: block;
+            background-color: transparent;
+            --poster-color: transparent;
+        }
+
+        /* Custom AR Button in Slot */
+        .ar-btn {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 30px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Hide the default AR button if we use our own slot */
+        #default-ar-button {
             display: none;
         }
 
-        #status {
-            position: absolute;
-            color: cyan;
-            z-index: 2;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 8px 12px;
-            border-radius: 4px;
-            pointer-events: none;
-        }
-
-        #controls {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 3;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(10px);
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid rgba(0, 255, 255, 0.3);
-            max-width: 300px;
-            color: #fff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        #controls h3 {
-            margin: 0 0 15px 0;
-            color: #00ffff;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
-            padding-bottom: 8px;
-        }
-
-        .control-group {
-            margin-bottom: 18px;
-        }
-
-        .control-group label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 6px;
-            font-size: 12px;
-            color: #aaa;
-        }
-
-        .control-group .value {
-            color: #00ff00;
-            font-weight: bold;
-            font-family: monospace;
-        }
-
-        input[type="range"] {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: rgba(255, 255, 255, 0.1);
-            outline: none;
-            -webkit-appearance: none;
-            appearance: none;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #00ffff, #00ff00);
-            cursor: pointer;
-            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-        }
-
-        input[type="range"]::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #00ffff, #00ff00);
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-        }
-
-        input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-            accent-color: #00ffff;
-        }
-
-        .checkbox-control {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .checkbox-control label {
-            margin: 0;
-        }
-
-        .section-divider {
-            height: 1px;
-            background: rgba(255, 255, 255, 0.1);
-            margin: 20px 0;
+        /* When model-viewer is not interacting, we still want it to look like a button container */
+        model-viewer::part(default-progress-bar) {
+            display: none;
         }
     </style>
-
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
-        crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
-        crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"
-        crossorigin="anonymous"></script>
-
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
 </head>
 
 <body>
 
-    <div id="container">
-        <div id="status">Loading System...</div>
-        <canvas id="bg_canvas"></canvas>
-        <canvas class="output_canvas" width="1280" height="720"></canvas>
+    <h1>Choose Experience</h1>
+
+    <div class="menu-container">
+        <!-- Button 1: Selfie Effect -->
+        <a href="selfie.html" class="btn">
+            Selfie Effect
+        </a>
+
+        <!-- Button 2: Place in Space (Native AR) -->
+        <!-- We wrap the button inside model-viewer to trigger AR -->
+        <!-- We hide the 3D preview by making the model-viewer small or transparent and overlaying the button -->
+        <model-viewer src="back_model.glb" ios-src="back_model.usdz" ar ar-modes="scene-viewer quick-look"
+            camera-controls disable-zoom auto-rotate shadow-intensity="0" environment-image="neutral"
+            style="width: 100%; height: 54px; margin: 0; padding: 0;">
+            <div slot="ar-button" class="btn" style="margin-top: 0; height: 100%; width: 100%; border-radius: 30px;">
+                Place in Space
+            </div>
+            <!-- Hide the 3D model preview by not having it visible or using a poster -->
+            <div slot="poster" style="background: transparent;"></div>
+        </model-viewer>
     </div>
-    <video class="input_video"></video>
-
-
-
-    <script type="module">
-        import * as THREE from 'three';
-        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
-        // =========================================================
-        //  === TUNING CONTROLS (Now controlled by sliders) ===
-        // =========================================================
-
-        let MODEL_WIDTH_PCT = 0.9;
-        let ROTATION_FIX_Y = 0.0;
-        let VERTICAL_OFFSET = 0.0;
-        let HORIZONTAL_OFFSET = 0.0;
-
-        // =========================================================
-        //  === SEGMENTATION QUALITY ENHANCEMENTS ===
-        // =========================================================
-
-        // Mask blur radius (in pixels) for soft feathered edges
-        // Higher values = softer edges, but may look too blurry
-        // Recommended range: 2-5px
-        const MASK_BLUR_PX = 3;
-
-        // Temporal smoothing alpha for reducing flicker
-        // Higher values = more responsive but more flicker
-        // Lower values = smoother but may lag behind movement
-        // Recommended range: 0.3-0.5
-        const MASK_SMOOTHING_ALPHA = 0.35;
-
-        // =========================================================
-
-        const bgCanvas = document.getElementById('bg_canvas');
-        const statusText = document.getElementById('status');
-
-        // Dynamic Resolution
-        let width = window.innerWidth;
-        let height = window.innerHeight;
-
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x000000); // Pure black to let light do the work
-
-        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-        camera.position.set(0, 0, 10);
-
-        const renderer = new THREE.WebGLRenderer({ canvas: bgCanvas, antialias: true });
-        renderer.setSize(width, height);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.shadowMap.enabled = true; // Enable shadows if we want them later
-
-        const loader = new GLTFLoader();
-        const textureLoader = new THREE.TextureLoader();
-        let loadedModel = null;
-        let pointLight = null;
-
-        // --- 1. Create Textured Background Plane ---
-        const bgGeometry = new THREE.PlaneGeometry(40, 40, 128, 128); // High segments for displacement
-
-        // Load textures
-        const bgDiffuse = textureLoader.load('./bg_diffuse.png');
-        const bgDisplacement = textureLoader.load('./bg_displacement.png');
-
-        const bgMaterial = new THREE.MeshStandardMaterial({
-            map: bgDiffuse,
-            displacementMap: bgDisplacement,
-            displacementScale: 2.0, // Adjust depth
-            color: 0xffffff,
-            roughness: 0.4,
-            metalness: 0.1
-        });
-
-        const bgPlane = new THREE.Mesh(bgGeometry, bgMaterial);
-        bgPlane.position.z = -5; // Behind the model
-        scene.add(bgPlane);
-
-        // --- Model Material ---
-        const neonMaterial = new THREE.MeshBasicMaterial({ color: 0xEB292D, wireframe: false });
-
-        function fitModelToCamera() {
-            if (!loadedModel) return;
-
-            // 1. Reset to get un-transformed bounds
-            loadedModel.rotation.set(0, 0, 0);
-            loadedModel.scale.set(1, 1, 1);
-            loadedModel.position.set(0, 0, 0);
-            loadedModel.updateMatrixWorld(true);
-
-            // 2. Camera Frustum at Z=0
-            const dist = camera.position.z;
-            const vFOV = THREE.MathUtils.degToRad(camera.fov);
-            const visibleHeight = 2 * Math.tan(vFOV / 2) * dist;
-            const visibleWidth = visibleHeight * camera.aspect;
-
-            // 3. Measure Model
-            const box = new THREE.Box3().setFromObject(loadedModel);
-            const size = new THREE.Vector3();
-            box.getSize(size);
-            const center = new THREE.Vector3();
-            box.getCenter(center);
-
-            // 4. Scale to Match Width
-            let scaleFactor = (visibleWidth / size.x) * MODEL_WIDTH_PCT;
-            loadedModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
-
-            // 5. Position Logic
-
-            // A. Align Front Face to Z=0 to ensure scale match
-            // (If model sticks out towards camera, it looks bigger than calculated)
-            const scaledMaxZ = box.max.z * scaleFactor;
-            loadedModel.position.z = -scaledMaxZ;
-
-            // B. Align Top to Top of Screen with Padding
-            const scaledTopY = box.max.y * scaleFactor;
-            const targetTopY = visibleHeight / 2;
-
-            // Add 5% screen height padding to match the 5% side padding (since width is 90%)
-            const topPadding = visibleHeight * 0.05;
-
-            loadedModel.position.y = (targetTopY - scaledTopY - topPadding) + VERTICAL_OFFSET;
-
-            // C. Center Horizontally
-            const scaledCenterX = center.x * scaleFactor;
-            loadedModel.position.x = -scaledCenterX + HORIZONTAL_OFFSET;
-
-            // 6. Apply Rotation
-            loadedModel.rotation.y = ROTATION_FIX_Y;
-        }
-
-        loader.load('./model.gltf', function (gltf) {
-            loadedModel = gltf.scene;
-
-            loadedModel.traverse((child) => {
-                if (child.isMesh) child.material = neonMaterial;
-            });
-
-            // --- 2. Attach Light to Model ---
-            pointLight = new THREE.PointLight(0xEB292D, 2, 20); // Color, Intensity, Distance
-            pointLight.position.set(0, 5, 0); // Center of model
-            loadedModel.add(pointLight);
-
-            scene.add(loadedModel);
-            fitModelToCamera();
-            statusText.innerText = "System Active";
-
-        }, undefined, function (error) {
-            console.error(error);
-            statusText.innerText = "Error: Check Console";
-        });
-
-        const renderScene = new RenderPass(scene, camera);
-        const bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 1.5, 0.4, 0.85);
-        bloomPass.threshold = 0;
-        bloomPass.strength = 2.0;
-        bloomPass.radius = 0.5;
-
-        const composer = new EffectComposer(renderer);
-        composer.addPass(renderScene);
-        composer.addPass(bloomPass);
-
-        // --- MediaPipe Logic ---
-        const videoElement = document.getElementsByClassName('input_video')[0];
-        const canvasElement = document.getElementsByClassName('output_canvas')[0];
-        const ctx = canvasElement.getContext('2d');
-
-        // --- Temporal Smoothing Setup ---
-        // Offscreen canvas to store the previous smoothed mask
-        let offscreenCanvas = null;
-        let offscreenCtx = null;
-        let previousMaskData = null;
-        let currentMaskData = null;
-
-        function initTemporalSmoothing(width, height) {
-            offscreenCanvas = document.createElement('canvas');
-            offscreenCanvas.width = width;
-            offscreenCanvas.height = height;
-            offscreenCtx = offscreenCanvas.getContext('2d');
-            previousMaskData = null; // Will be initialized on first frame
-            currentMaskData = null;
-        }
-
-        function handleResize() {
-            width = window.innerWidth;
-            height = window.innerHeight;
-
-            camera.aspect = width / height;
-            camera.updateProjectionMatrix();
-
-            renderer.setSize(width, height);
-            composer.setSize(width, height);
-
-            // Update Bloom Resolution
-            bloomPass.resolution.set(width, height);
-
-            // Update Canvas Size
-            canvasElement.width = width;
-            canvasElement.height = height;
-
-            // Reinitialize temporal smoothing with new dimensions
-            initTemporalSmoothing(width, height);
-
-            fitModelToCamera();
-        }
-
-        window.addEventListener('resize', handleResize);
-        handleResize(); // Initial call to set sizes
-
-        function animate() {
-            requestAnimationFrame(animate);
-
-            // Neon Flicker Effect
-            const time = Date.now() * 0.005;
-            // Random sharp flickers
-            const flicker = Math.random() > 0.9 ? Math.random() * 0.5 : 0;
-            // Gentle pulsation
-            const pulse = Math.sin(time * 2) * 0.1;
-
-            // Apply to Bloom
-            bloomPass.strength = 2.0 + pulse + flicker;
-
-            // Apply to Light
-            if (pointLight) {
-                pointLight.intensity = 2.0 + (pulse * 2) + (flicker * 3);
-            }
-
-            composer.render();
-        }
-        animate();
-
-        function onResults(results) {
-            ctx.save();
-            ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-            // Mirror Effect: Flip Horizontally
-            ctx.translate(canvasElement.width, 0);
-            ctx.scale(-1, 1);
-
-            // Calculate scaling to fit height (Cover Mode)
-            const img = results.image;
-            const imgRatio = img.width / img.height;
-
-            // We want height to match canvas height
-            const drawHeight = canvasElement.height;
-            const drawWidth = drawHeight * imgRatio;
-
-            // Center horizontally
-            // Note: Since we are flipped, drawing at positive X moves "left" visually.
-            // But the math for centering remains the same relative to the origin.
-            const x = (canvasElement.width - drawWidth) / 2;
-            const y = 0;
-
-            // =========================================================
-            // TEMPORAL SMOOTHING OF SEGMENTATION MASK
-            // =========================================================
-
-            // Initialize offscreen canvas if not already done
-            if (!offscreenCanvas) {
-                initTemporalSmoothing(drawWidth, drawHeight);
-            }
-
-            // Resize offscreen canvas if dimensions changed
-            if (offscreenCanvas.width !== drawWidth || offscreenCanvas.height !== drawHeight) {
-                offscreenCanvas.width = drawWidth;
-                offscreenCanvas.height = drawHeight;
-                previousMaskData = null; // Reset on dimension change
-            }
-
-            // Draw the new mask to offscreen canvas to get ImageData
-            offscreenCtx.clearRect(0, 0, drawWidth, drawHeight);
-            offscreenCtx.drawImage(results.segmentationMask, 0, 0, drawWidth, drawHeight);
-            currentMaskData = offscreenCtx.getImageData(0, 0, drawWidth, drawHeight);
-
-            // Blend with previous mask using exponential moving average
-            if (previousMaskData && previousMaskData.width === currentMaskData.width && previousMaskData.height === currentMaskData.height) {
-                const current = currentMaskData.data;
-                const previous = previousMaskData.data;
-
-                // Blend each pixel: smoothed = alpha * current + (1 - alpha) * previous
-                for (let i = 0; i < current.length; i += 4) {
-                    // Only blend the alpha channel (segmentation mask is grayscale, stored in all channels)
-                    // We'll blend all channels for consistency
-                    current[i] = MASK_SMOOTHING_ALPHA * current[i] + (1 - MASK_SMOOTHING_ALPHA) * previous[i];
-                    current[i + 1] = MASK_SMOOTHING_ALPHA * current[i + 1] + (1 - MASK_SMOOTHING_ALPHA) * previous[i + 1];
-                    current[i + 2] = MASK_SMOOTHING_ALPHA * current[i + 2] + (1 - MASK_SMOOTHING_ALPHA) * previous[i + 2];
-                    current[i + 3] = MASK_SMOOTHING_ALPHA * current[i + 3] + (1 - MASK_SMOOTHING_ALPHA) * previous[i + 3];
-                }
-            }
-
-            // Store current smoothed mask as previous for next frame
-            previousMaskData = new ImageData(
-                new Uint8ClampedArray(currentMaskData.data),
-                currentMaskData.width,
-                currentMaskData.height
-            );
-
-            // Put the smoothed mask back to offscreen canvas
-            offscreenCtx.putImageData(currentMaskData, 0, 0);
-
-            // =========================================================
-            // FEATHERED / BLURRED MASK EDGES
-            // =========================================================
-
-            // Apply blur filter to the smoothed mask for soft edges
-            ctx.filter = `blur(${MASK_BLUR_PX}px)`;
-            ctx.drawImage(offscreenCanvas, x, y, drawWidth, drawHeight);
-            ctx.filter = 'none'; // Reset filter
-
-            // =========================================================
-            // COMPOSITE FINAL IMAGE
-            // =========================================================
-
-            // Use the blurred mask as a stencil
-            ctx.globalCompositeOperation = 'source-in';
-            ctx.drawImage(results.image, x, y, drawWidth, drawHeight);
-
-            // Reset composite operation for next frame
-            ctx.globalCompositeOperation = 'source-over';
-
-            ctx.restore();
-        }
-
-        try {
-            const selfieSegmentation = new SelfieSegmentation({
-                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
-            });
-
-            // =========================================================
-            // HIGHER-QUALITY MEDIAPIPE MODEL OPTIONS
-            // =========================================================
-            // modelSelection: 1 = Higher quality model (more accurate but slower)
-            // modelSelection: 0 = Faster model (less accurate but faster)
-            //
-            // selfieMode: true = Optimized for front-facing camera (mirrors detection)
-            // selfieMode: false = Use this if you're NOT using a front-facing camera
-            //                     (e.g., rear camera, or pre-recorded video)
-            selfieSegmentation.setOptions({
-                modelSelection: 1,   // Higher quality model
-                selfieMode: true     // Front-facing camera behavior
-            });
-
-            selfieSegmentation.onResults(onResults);
-
-            const mpCamera = new Camera(videoElement, {
-                onFrame: async () => { await selfieSegmentation.send({ image: videoElement }); },
-                width: 1920,
-                height: 1080
-            });
-            mpCamera.start();
-        } catch (e) {
-            console.error("MediaPipe Error:", e);
-            statusText.innerText = "Error: Camera/MediaPipe Failed";
-        }
-    </script>
 
 </body>
 
