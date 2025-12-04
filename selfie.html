@@ -509,38 +509,60 @@
             ctx.restore();
         }
 
-        try {
-            const selfieSegmentation = new SelfieSegmentation({
-                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
-            });
+        // =========================================================
+        // NATIVE CAMERA INITIALIZATION (iOS Compatible)
+        // =========================================================
 
-            // =========================================================
-            // HIGHER-QUALITY MEDIAPIPE MODEL OPTIONS
-            // =========================================================
-            // modelSelection: 1 = Higher quality model (more accurate but slower)
-            // modelSelection: 0 = Faster model (less accurate but faster)
-            //
-            // selfieMode: true = Optimized for front-facing camera (mirrors detection)
-            // selfieMode: false = Use this if you're NOT using a front-facing camera
-            //                     (e.g., rear camera, or pre-recorded video)
-            selfieSegmentation.setOptions({
-                modelSelection: 1,   // Higher quality model
-                selfieMode: true     // Front-facing camera behavior
-            });
+        const selfieSegmentation = new SelfieSegmentation({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+        });
 
-            selfieSegmentation.onResults(onResults);
+        // Higher-quality MediaPipe model options
+        selfieSegmentation.setOptions({
+            modelSelection: 1,   // Higher quality model
+            selfieMode: true     // Front-facing camera behavior
+        });
 
-            const mpCamera = new Camera(videoElement, {
-                onFrame: async () => { await selfieSegmentation.send({ image: videoElement }); },
-                facingMode: 'user',
-                width: 1920,
-                height: 1080
-            });
-            mpCamera.start();
-        } catch (e) {
-            console.error("MediaPipe Error:", e);
-            statusText.innerText = "Error: Camera/MediaPipe Failed";
+        selfieSegmentation.onResults(onResults);
+
+        // Use native getUserMedia for better iOS compatibility
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                });
+
+                videoElement.srcObject = stream;
+                videoElement.play();
+
+                statusText.innerText = "Camera Active";
+
+                // Manual frame processing loop
+                async function processFrame() {
+                    if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                        await selfieSegmentation.send({ image: videoElement });
+                    }
+                    requestAnimationFrame(processFrame);
+                }
+
+                // Wait for video to be ready before starting processing
+                videoElement.onloadedmetadata = () => {
+                    processFrame();
+                };
+
+            } catch (e) {
+                console.error("Camera Error:", e);
+                statusText.innerText = `Camera Error: ${e.message || 'Access Denied'}`;
+                alert(`Cannot access camera: ${e.message || 'Please grant camera permissions and ensure you are using HTTPS'}`);
+            }
         }
+
+        startCamera();
     </script>
 
 </body>
