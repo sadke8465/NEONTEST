@@ -184,7 +184,7 @@
         <canvas id="bg_canvas"></canvas>
         <canvas class="output_canvas" width="1280" height="720"></canvas>
     </div>
-    <video class="input_video"></video>
+    <video class="input_video" autoplay playsinline></video>
 
 
 
@@ -538,7 +538,9 @@
                 });
 
                 videoElement.srcObject = stream;
-                videoElement.play();
+
+                // Wait for video to actually start playing
+                await videoElement.play();
 
                 statusText.innerText = "Camera Active";
 
@@ -550,10 +552,8 @@
                     requestAnimationFrame(processFrame);
                 }
 
-                // Wait for video to be ready before starting processing
-                videoElement.onloadedmetadata = () => {
-                    processFrame();
-                };
+                // Start processing after video is playing
+                processFrame();
 
             } catch (e) {
                 console.error("Camera Error:", e);
