@@ -238,27 +238,11 @@
         neonRenderer.setSize(width, height);
         neonRenderer.setPixelRatio(window.devicePixelRatio);
 
-        const textureLoader = new THREE.TextureLoader();
+
         let neonModel = null;
         let neonPointLight = null;
 
-        // Background Plane for Neon Scene
-        const bgGeometry = new THREE.PlaneGeometry(40, 40, 128, 128);
-        const bgDiffuse = textureLoader.load('./bg_diffuse.png');
-        const bgDisplacement = textureLoader.load('./bg_displacement.png');
 
-        const bgMaterial = new THREE.MeshStandardMaterial({
-            map: bgDiffuse,
-            displacementMap: bgDisplacement,
-            displacementScale: 2.0,
-            color: 0xffffff,
-            roughness: 0.4,
-            metalness: 0.1
-        });
-
-        const bgPlane = new THREE.Mesh(bgGeometry, bgMaterial);
-        bgPlane.position.z = -5;
-        neonScene.add(bgPlane);
 
         const neonMaterial = new THREE.MeshBasicMaterial({ color: 0xEB292D, wireframe: false });
 
