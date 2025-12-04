@@ -183,8 +183,9 @@
         // =========================================================
 
         // Segmentation Quality
-        const MASK_BLUR_PX = 3;
-        const MASK_SMOOTHING_ALPHA = 0.35;
+        const MASK_BLUR_PX = 4; // Increased slightly for better smoothing before hardening
+        const MASK_SMOOTHING_ALPHA = 0.35; // 0.35 means 35% new, 65% old
+        const MASK_HARDENING_ITERATIONS = 2; // How many times to draw mask over itself to tighten edges
 
         // Model Settings
         const MODEL_SCALE_BASE = 1.0;
@@ -195,11 +196,15 @@
 
         const cameraFeedCanvas = document.getElementById('camera_feed_canvas');
         const cameraFeedCtx = cameraFeedCanvas.getContext('2d');
+        cameraFeedCtx.imageSmoothingEnabled = true;
+        cameraFeedCtx.imageSmoothingQuality = 'high';
 
         const threeCanvas = document.getElementById('three_canvas');
 
         const outputCanvas = document.querySelector('.output_canvas');
         const outputCtx = outputCanvas.getContext('2d');
+        outputCtx.imageSmoothingEnabled = true;
+        outputCtx.imageSmoothingQuality = 'high';
 
         const statusText = document.getElementById('status');
         const videoElement = document.querySelector('.input_video');
@@ -274,16 +279,28 @@
 
         let offscreenCanvas = null;
         let offscreenCtx = null;
-        let previousMaskData = null;
-        let currentMaskData = null;
+        let maskAccumulatorCanvas = null;
+        let maskAccumulatorCtx = null;
+        let isFirstFrame = true;
 
         function initTemporalSmoothing(w, h) {
+            // Scratch canvas for blur/harden operations
             offscreenCanvas = document.createElement('canvas');
             offscreenCanvas.width = w;
             offscreenCanvas.height = h;
             offscreenCtx = offscreenCanvas.getContext('2d');
-            previousMaskData = null;
-            currentMaskData = null;
+            offscreenCtx.imageSmoothingEnabled = true;
+            offscreenCtx.imageSmoothingQuality = 'high';
+
+            // Accumulator for temporal smoothing (stores previous frame)
+            maskAccumulatorCanvas = document.createElement('canvas');
+            maskAccumulatorCanvas.width = w;
+            maskAccumulatorCanvas.height = h;
+            maskAccumulatorCtx = maskAccumulatorCanvas.getContext('2d');
+            maskAccumulatorCtx.imageSmoothingEnabled = true;
+            maskAccumulatorCtx.imageSmoothingQuality = 'high';
+
+            isFirstFrame = true;
         }
 
         // =========================================================
@@ -379,46 +396,44 @@
             outputCtx.save();
             outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
 
-            // Mirror (Removed to flip)
-            // outputCtx.translate(outputCanvas.width, 0);
-            // outputCtx.scale(-1, 1);
+            // --- Temporal Smoothing (GPU) ---
+            if (!maskAccumulatorCanvas) initTemporalSmoothing(drawWidth, drawHeight);
 
-            // --- Temporal Smoothing ---
-            if (!offscreenCanvas) initTemporalSmoothing(drawWidth, drawHeight);
-            if (offscreenCanvas.width !== drawWidth || offscreenCanvas.height !== drawHeight) {
-                offscreenCanvas.width = drawWidth;
-                offscreenCanvas.height = drawHeight;
-                previousMaskData = null;
+            // Resize check
+            if (maskAccumulatorCanvas.width !== drawWidth || maskAccumulatorCanvas.height !== drawHeight) {
+                initTemporalSmoothing(drawWidth, drawHeight);
             }
 
-            // Draw mask to offscreen
+            // 1. Accumulate Mask (Temporal Smoothing)
+            // Blend New Mask into Accumulator
+            maskAccumulatorCtx.globalCompositeOperation = 'source-over';
+            // If first frame, use alpha 1.0 to fill immediately, otherwise blend
+            maskAccumulatorCtx.globalAlpha = isFirstFrame ? 1.0 : MASK_SMOOTHING_ALPHA;
+            maskAccumulatorCtx.drawImage(results.segmentationMask, 0, 0, drawWidth, drawHeight);
+            maskAccumulatorCtx.globalAlpha = 1.0;
+            isFirstFrame = false;
+
+            // 2. Process Mask (Blur + Harden)
+            // Clear scratch canvas
             offscreenCtx.clearRect(0, 0, drawWidth, drawHeight);
-            offscreenCtx.drawImage(results.segmentationMask, 0, 0, drawWidth, drawHeight);
-            currentMaskData = offscreenCtx.getImageData(0, 0, drawWidth, drawHeight);
 
-            // Blend
-            if (previousMaskData && previousMaskData.width === currentMaskData.width) {
-                const current = currentMaskData.data;
-                const previous = previousMaskData.data;
-                for (let i = 0; i < current.length; i += 4) {
-                    const alpha = MASK_SMOOTHING_ALPHA;
-                    current[i] = alpha * current[i] + (1 - alpha) * previous[i]; // R
-                    current[i + 1] = alpha * current[i + 1] + (1 - alpha) * previous[i + 1]; // G
-                    current[i + 2] = alpha * current[i + 2] + (1 - alpha) * previous[i + 2]; // B
-                    current[i + 3] = alpha * current[i + 3] + (1 - alpha) * previous[i + 3]; // A
-                }
+            // Draw Accumulator to Scratch with Blur
+            offscreenCtx.filter = `blur(${MASK_BLUR_PX}px)`;
+            offscreenCtx.drawImage(maskAccumulatorCanvas, 0, 0, drawWidth, drawHeight);
+            offscreenCtx.filter = 'none';
+
+            // Harden Edges (Draw onto itself to boost alpha/contrast)
+            offscreenCtx.globalCompositeOperation = 'source-over';
+            for (let i = 0; i < MASK_HARDENING_ITERATIONS; i++) {
+                offscreenCtx.drawImage(offscreenCanvas, 0, 0);
             }
-            // Save for next frame
-            previousMaskData = new ImageData(new Uint8ClampedArray(currentMaskData.data), drawWidth, drawHeight);
-            offscreenCtx.putImageData(currentMaskData, 0, 0);
+            // Optional: Use source-in to tighten if needed, but source-over boosting is usually safer for "smoky" edges
 
-            // --- Draw Segmented User ---
-            // 1. Draw Mask with Blur (Stencil)
-            outputCtx.filter = `blur(${MASK_BLUR_PX}px)`;
+            // 3. Final Composite
+            // Draw the processed mask to output
             outputCtx.drawImage(offscreenCanvas, x, y, drawWidth, drawHeight);
-            outputCtx.filter = 'none';
 
-            // 2. Composite Source In (Keep only masked area of video)
+            // Source-In the video content
             outputCtx.globalCompositeOperation = 'source-in';
             outputCtx.drawImage(results.image, x, y, drawWidth, drawHeight);
 
@@ -435,7 +450,7 @@
         });
 
         selfieSegmentation.setOptions({
-            modelSelection: 1,
+            modelSelection: 0, // 0 = General (Better edges), 1 = Landscape (Faster)
             selfieMode: true
         });
 
