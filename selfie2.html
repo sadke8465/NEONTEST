@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selfie Mode 2</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: monospace;
+        }
+
+        #container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Layer 1: Clean Camera Feed (Furthest Back) */
+        #camera_feed_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            object-fit: cover;
+        }
+
+        /* Layer 2: 3D Model (Middle) */
+        #three_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+            /* Let clicks pass through if needed */
+        }
+
+        /* Layer 3: Segmented User (Front) */
+        .output_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+        }
+
+        .input_video {
+            display: none;
+        }
+
+        #status {
+            position: absolute;
+            color: cyan;
+            z-index: 3;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 12px;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        /* Back button */
+        #back_btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 4;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            border: 1px solid white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-family: sans-serif;
+            text-transform: uppercase;
+            font-size: 12px;
+            backdrop-filter: blur(4px);
+        }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"
+        crossorigin="anonymous"></script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+
+    <div id="container">
+        <div id="status">Loading System...</div>
+        <a href="index.html" id="back_btn">Back</a>
+
+        <!-- Layer 1 -->
+        <canvas id="camera_feed_canvas"></canvas>
+
+        <!-- Layer 2 -->
+        <canvas id="three_canvas"></canvas>
+
+        <!-- Layer 3 -->
+        <canvas class="output_canvas"></canvas>
+    </div>
+    <video class="input_video"></video>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // =========================================================
+        //  === CONFIGURATION ===
+        // =========================================================
+
+        // Segmentation Quality
+        const MASK_BLUR_PX = 3;
+        const MASK_SMOOTHING_ALPHA = 0.35;
+
+        // Model Settings
+        const MODEL_SCALE_BASE = 1.0;
+
+        // =========================================================
+        //  === SETUP ===
+        // =========================================================
+
+        const cameraFeedCanvas = document.getElementById('camera_feed_canvas');
+        const cameraFeedCtx = cameraFeedCanvas.getContext('2d');
+
+        const threeCanvas = document.getElementById('three_canvas');
+
+        const outputCanvas = document.querySelector('.output_canvas');
+        const outputCtx = outputCanvas.getContext('2d');
+
+        const statusText = document.getElementById('status');
+        const videoElement = document.querySelector('.input_video');
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+
+        // =========================================================
+        //  === THREE.JS SCENE (Layer 2) ===
+        // =========================================================
+
+        const scene = new THREE.Scene();
+        // Transparent background for the 3D scene so Layer 1 shows through
+        scene.background = null;
+
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+        camera.position.set(0, 0, 5);
+
+        const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, alpha: true, antialias: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        dirLight.position.set(2, 5, 5);
+        scene.add(dirLight);
+
+        // Load Model
+        const loader = new GLTFLoader();
+        let loadedModel = null;
+        let mixer = null;
+
+        loader.load('./back_model.glb', function (gltf) {
+            loadedModel = gltf.scene;
+
+            // Center the model
+            const box = new THREE.Box3().setFromObject(loadedModel);
+            const center = box.getCenter(new THREE.Vector3());
+            loadedModel.position.sub(center); // Center at 0,0,0
+
+            // Initial Scale (will be animated)
+            loadedModel.scale.set(MODEL_SCALE_BASE, MODEL_SCALE_BASE, MODEL_SCALE_BASE);
+
+            scene.add(loadedModel);
+            statusText.innerText = "Active";
+
+            // Check for animations if any (though we will do manual breathing)
+            if (gltf.animations && gltf.animations.length) {
+                mixer = new THREE.AnimationMixer(loadedModel);
+                gltf.animations.forEach((clip) => {
+                    mixer.clipAction(clip).play();
+                });
+            }
+
+        }, undefined, function (error) {
+            console.error(error);
+            statusText.innerText = "Error loading model";
+        });
+
+        // =========================================================
+        //  === TEMPORAL SMOOTHING HELPERS ===
+        // =========================================================
+
+        let offscreenCanvas = null;
+        let offscreenCtx = null;
+        let previousMaskData = null;
+        let currentMaskData = null;
+
+        function initTemporalSmoothing(w, h) {
+            offscreenCanvas = document.createElement('canvas');
+            offscreenCanvas.width = w;
+            offscreenCanvas.height = h;
+            offscreenCtx = offscreenCanvas.getContext('2d');
+            previousMaskData = null;
+            currentMaskData = null;
+        }
+
+        // =========================================================
+        //  === RESIZE HANDLER ===
+        // =========================================================
+
+        function handleResize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+
+            // Update Three.js
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+
+            // Update Canvases
+            cameraFeedCanvas.width = width;
+            cameraFeedCanvas.height = height;
+
+            outputCanvas.width = width;
+            outputCanvas.height = height;
+
+            initTemporalSmoothing(width, height);
+        }
+        window.addEventListener('resize', handleResize);
+        handleResize();
+
+        // =========================================================
+        //  === ANIMATION LOOP ===
+        // =========================================================
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.001; // Seconds
+
+            // Breathing Animation
+            if (loadedModel) {
+                // Pulse scale: Base + sine wave
+                // e.g., oscillate between 0.9 and 1.1 scale
+                const scale = MODEL_SCALE_BASE + Math.sin(time * 2.0) * 0.1;
+                loadedModel.scale.set(scale, scale, scale);
+
+                // Subtle rotation
+                loadedModel.rotation.y = Math.sin(time * 0.5) * 0.2;
+                loadedModel.rotation.x = Math.cos(time * 0.3) * 0.1;
+            }
+
+            if (mixer) mixer.update(0.016);
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // =========================================================
+        //  === MEDIAPIPE RESULTS ===
+        // =========================================================
+
+        function onResults(results) {
+            // 1. Prepare Dimensions
+            const img = results.image;
+            const imgRatio = img.width / img.height;
+            const canvasRatio = outputCanvas.width / outputCanvas.height;
+
+            // "Cover" logic to fill screen
+            let drawWidth, drawHeight;
+            if (imgRatio > canvasRatio) {
+                drawHeight = outputCanvas.height;
+                drawWidth = drawHeight * imgRatio;
+            } else {
+                drawWidth = outputCanvas.width;
+                drawHeight = drawWidth / imgRatio;
+            }
+
+            const x = (outputCanvas.width - drawWidth) / 2;
+            const y = (outputCanvas.height - drawHeight) / 2;
+
+            // -----------------------------------------------------
+            // LAYER 1: CLEAN CAMERA FEED (Background)
+            // -----------------------------------------------------
+            cameraFeedCtx.save();
+            cameraFeedCtx.clearRect(0, 0, cameraFeedCanvas.width, cameraFeedCanvas.height);
+            // Mirror
+            cameraFeedCtx.translate(cameraFeedCanvas.width, 0);
+            cameraFeedCtx.scale(-1, 1);
+            cameraFeedCtx.drawImage(results.image, x, y, drawWidth, drawHeight);
+            cameraFeedCtx.restore();
+
+            // -----------------------------------------------------
+            // LAYER 3: SEGMENTED USER (Foreground)
+            // -----------------------------------------------------
+            outputCtx.save();
+            outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+
+            // Mirror
+            outputCtx.translate(outputCanvas.width, 0);
+            outputCtx.scale(-1, 1);
+
+            // --- Temporal Smoothing ---
+            if (!offscreenCanvas) initTemporalSmoothing(drawWidth, drawHeight);
+            if (offscreenCanvas.width !== drawWidth || offscreenCanvas.height !== drawHeight) {
+                offscreenCanvas.width = drawWidth;
+                offscreenCanvas.height = drawHeight;
+                previousMaskData = null;
+            }
+
+            // Draw mask to offscreen
+            offscreenCtx.clearRect(0, 0, drawWidth, drawHeight);
+            offscreenCtx.drawImage(results.segmentationMask, 0, 0, drawWidth, drawHeight);
+            currentMaskData = offscreenCtx.getImageData(0, 0, drawWidth, drawHeight);
+
+            // Blend
+            if (previousMaskData && previousMaskData.width === currentMaskData.width) {
+                const current = currentMaskData.data;
+                const previous = previousMaskData.data;
+                for (let i = 0; i < current.length; i += 4) {
+                    const alpha = MASK_SMOOTHING_ALPHA;
+                    current[i] = alpha * current[i] + (1 - alpha) * previous[i]; // R
+                    current[i + 1] = alpha * current[i + 1] + (1 - alpha) * previous[i + 1]; // G
+                    current[i + 2] = alpha * current[i + 2] + (1 - alpha) * previous[i + 2]; // B
+                    current[i + 3] = alpha * current[i + 3] + (1 - alpha) * previous[i + 3]; // A
+                }
+            }
+            // Save for next frame
+            previousMaskData = new ImageData(new Uint8ClampedArray(currentMaskData.data), drawWidth, drawHeight);
+            offscreenCtx.putImageData(currentMaskData, 0, 0);
+
+            // --- Draw Segmented User ---
+            // 1. Draw Mask with Blur (Stencil)
+            outputCtx.filter = `blur(${MASK_BLUR_PX}px)`;
+            outputCtx.drawImage(offscreenCanvas, x, y, drawWidth, drawHeight);
+            outputCtx.filter = 'none';
+
+            // 2. Composite Source In (Keep only masked area of video)
+            outputCtx.globalCompositeOperation = 'source-in';
+            outputCtx.drawImage(results.image, x, y, drawWidth, drawHeight);
+
+            outputCtx.globalCompositeOperation = 'source-over';
+            outputCtx.restore();
+        }
+
+        // =========================================================
+        //  === MEDIAPIPE INIT ===
+        // =========================================================
+
+        const selfieSegmentation = new SelfieSegmentation({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+        });
+
+        selfieSegmentation.setOptions({
+            modelSelection: 1,
+            selfieMode: true
+        });
+
+        selfieSegmentation.onResults(onResults);
+
+        const mpCamera = new Camera(videoElement, {
+            onFrame: async () => { await selfieSegmentation.send({ image: videoElement }); },
+            width: 1280,
+            height: 720
+        });
+        mpCamera.start();
+
+    </script>
+</body>
+
+</html>
