@@ -120,7 +120,8 @@
 
         #mode_indicator {
             position: absolute;
-            bottom: 20px;
+            bottom: 120px;
+            /* Moved up to make room for capture button */
             left: 50%;
             transform: translateX(-50%);
             z-index: 5;
@@ -133,6 +134,87 @@
             pointer-events: none;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        /* Capture Button */
+        #capture_container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #capture_btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            border: 4px solid white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #capture_btn:active {
+            transform: scale(0.95);
+        }
+
+        #capture_inner {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: white;
+            transition: all 0.3s ease;
+        }
+
+        #capture_btn.recording #capture_inner {
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            background: #ff3b30;
+        }
+
+        #capture_btn.recording {
+            transform: scale(1.1);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Progress Ring for Long Press */
+        .progress-ring {
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            width: 96px;
+            height: 96px;
+            transform: rotate(-90deg);
+            pointer-events: none;
+        }
+
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.1s linear;
+            transform-origin: 50% 50%;
+            stroke: #ff3b30;
+            stroke-width: 4;
+            fill: transparent;
+            stroke-dasharray: 283;
+            /* 2 * PI * 45 */
+            stroke-dashoffset: 283;
+            opacity: 0;
+        }
+
+        #capture_btn.recording .progress-ring__circle {
+            opacity: 1;
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 10s linear;
+            /* Max video length visual */
         }
     </style>
 
@@ -172,6 +254,16 @@
 
         <!-- Layer 4: Neon Scene (in front of user) -->
         <canvas id="neon_canvas"></canvas>
+
+        <div id="capture_container">
+            <div id="capture_btn">
+                <div id="capture_inner"></div>
+                <svg class="progress-ring" width="96" height="96">
+                    <circle class="progress-ring__circle" cx="48" cy="48" r="45" />
+                </svg>
+            </div>
+        </div>
+        <a id="download_anchor" style="display:none"></a>
     </div>
     <video class="input_video" autoplay playsinline></video>
 
@@ -672,6 +764,196 @@
         }
 
         startCamera();
+
+        // =========================================================
+        //  === CAPTURE & RECORDING ===
+        // =========================================================
+
+        const captureBtn = document.getElementById('capture_btn');
+        const downloadAnchor = document.getElementById('download_anchor');
+        let recordingCanvas = null;
+        let recordingCtx = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+        let pressTimer = null;
+        const LONG_PRESS_MS = 500;
+
+        function getCompositeCanvas() {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            // 1. Background (Camera Feed)
+            ctx.drawImage(cameraFeedCanvas, 0, 0);
+
+            // 2. Back Model (if active)
+            if (!isNeonMode) {
+                ctx.drawImage(backModelCanvas, 0, 0);
+            }
+
+            // 3. User (Segmented)
+            ctx.drawImage(outputCanvas, 0, 0);
+
+            // 4. Neon (if active)
+            if (isNeonMode) {
+                ctx.drawImage(neonCanvas, 0, 0);
+            }
+
+            return canvas;
+        }
+
+        function updateRecordingFrame() {
+            if (!isRecording || !recordingCtx) return;
+
+            // 1. Background
+            recordingCtx.drawImage(cameraFeedCanvas, 0, 0);
+
+            // 2. Back Model
+            if (!isNeonMode) recordingCtx.drawImage(backModelCanvas, 0, 0);
+
+            // 3. User
+            recordingCtx.drawImage(outputCanvas, 0, 0);
+
+            // 4. Neon
+            if (isNeonMode) recordingCtx.drawImage(neonCanvas, 0, 0);
+
+            requestAnimationFrame(updateRecordingFrame);
+        }
+
+        async function shareMedia(blob, filename) {
+            const file = new File([blob], filename, { type: blob.type });
+
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Dual Selfie Capture',
+                        text: 'Check out my Dual Selfie!'
+                    });
+                } catch (err) {
+                    console.warn('Share failed:', err);
+                    downloadMedia(blob, filename);
+                }
+            } else {
+                downloadMedia(blob, filename);
+            }
+        }
+
+        function downloadMedia(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            downloadAnchor.href = url;
+            downloadAnchor.download = filename;
+            downloadAnchor.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function capturePhoto() {
+            const canvas = getCompositeCanvas();
+            canvas.toBlob(blob => {
+                shareMedia(blob, `selfie_${Date.now()}.png`);
+            }, 'image/png');
+
+            // Flash effect
+            const flash = document.createElement('div');
+            flash.style.position = 'fixed';
+            flash.style.top = '0';
+            flash.style.left = '0';
+            flash.style.width = '100%';
+            flash.style.height = '100%';
+            flash.style.backgroundColor = 'white';
+            flash.style.opacity = '1';
+            flash.style.zIndex = '9999';
+            flash.style.transition = 'opacity 0.2s ease-out';
+            document.body.appendChild(flash);
+            setTimeout(() => {
+                flash.style.opacity = '0';
+                setTimeout(() => flash.remove(), 200);
+            }, 50);
+        }
+
+        function startRecording() {
+            isRecording = true;
+            captureBtn.classList.add('recording');
+
+            recordingCanvas = document.createElement('canvas');
+            recordingCanvas.width = width;
+            recordingCanvas.height = height;
+            recordingCtx = recordingCanvas.getContext('2d');
+
+            const stream = recordingCanvas.captureStream(30); // 30 FPS
+            recordedChunks = [];
+
+            // Prefer H.264 for better compatibility, fallback to default
+            let options = { mimeType: 'video/webm;codecs=h264' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'video/webm' };
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (e) {
+                console.error('MediaRecorder error:', e);
+                isRecording = false;
+                captureBtn.classList.remove('recording');
+                alert('Video recording not supported on this device/browser.');
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                shareMedia(blob, `video_${Date.now()}.webm`);
+            };
+
+            mediaRecorder.start();
+            updateRecordingFrame();
+        }
+
+        function stopRecording() {
+            if (!isRecording) return;
+            isRecording = false;
+            captureBtn.classList.remove('recording');
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+        }
+
+        // Input Handling
+        function handlePressStart(e) {
+            // Only handle left click or touch
+            if (e.type === 'mousedown' && e.button !== 0) return;
+
+            e.preventDefault(); // Prevent mouse emulation on touch
+            pressTimer = setTimeout(() => {
+                startRecording();
+            }, LONG_PRESS_MS);
+        }
+
+        function handlePressEnd(e) {
+            e.preventDefault();
+            if (pressTimer) clearTimeout(pressTimer);
+
+            if (isRecording) {
+                stopRecording();
+            } else {
+                capturePhoto();
+            }
+        }
+
+        captureBtn.addEventListener('mousedown', handlePressStart);
+        captureBtn.addEventListener('touchstart', handlePressStart);
+
+        captureBtn.addEventListener('mouseup', handlePressEnd);
+        captureBtn.addEventListener('touchend', handlePressEnd);
+        captureBtn.addEventListener('mouseleave', () => {
+            if (pressTimer) clearTimeout(pressTimer);
+            if (isRecording) stopRecording();
+        });
     </script>
 </body>
 
