@@ -829,18 +829,25 @@
         async function shareMedia(blob, filename) {
             const file = new File([blob], filename, { type: blob.type });
 
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            // Always try to share first if navigator.share is available
+            if (navigator.share) {
                 try {
                     await navigator.share({
                         files: [file],
                         title: 'Dual Selfie Capture',
                         text: 'Check out my Dual Selfie!'
                     });
+                    return; // Success, exit
                 } catch (err) {
-                    console.warn('Share failed:', err);
-                    downloadMedia(blob, filename);
+                    // If user cancelled or share failed, fall through to download
+                    console.warn('Share failed or cancelled:', err);
+                    if (err.name !== 'AbortError') {
+                        // Only download if it wasn't a user cancellation
+                        downloadMedia(blob, filename);
+                    }
                 }
             } else {
+                // Share API not available, download instead
                 downloadMedia(blob, filename);
             }
         }

@@ -8,6 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@600;700&display=swap" rel="stylesheet">
+    <!-- Import model-viewer -->
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -217,8 +219,8 @@
 
             <!-- Activate Buttons -->
             <div class="buttons-container">
-                <a href="selfie3.html" class="activate-btn">
-                    <span class="activate-text">Activate 1</span>
+                <a href="selfie3.html?switch_mode=true" class="activate-btn">
+                    <span class="activate-text">Switch Mode</span>
                     <div class="play-icon-container">
                         <svg class="play-icon" width="19" height="22" viewBox="0 0 19 22" fill="none"
                             xmlns="http://www.w3.org/2000/svg">
@@ -229,17 +231,23 @@
                     </div>
                 </a>
 
-                <a href="selfie3.html" class="activate-btn">
-                    <span class="activate-text">Activate 2</span>
-                    <div class="play-icon-container">
-                        <svg class="play-icon" width="19" height="22" viewBox="0 0 19 22" fill="none"
-                            xmlns="http://www.w3.org/2000/svg">
-                            <path
-                                d="M18 8.93201C19.3333 9.70181 19.3333 11.6263 18 12.3961L3 21.0564C1.66667 21.8262 8.49539e-07 20.8639 9.16837e-07 19.3243L1.67394e-06 2.00381C1.74124e-06 0.464207 1.66667 -0.498043 3 0.271757L18 8.93201Z"
-                                fill="currentColor" />
-                        </svg>
+                <model-viewer src="back_model.glb" ios-src="back_model.usdz" ar ar-modes="scene-viewer quick-look webxr"
+                    ar-scale="auto" ar-placement="floor" camera-controls touch-action="pan-y" disable-zoom auto-rotate
+                    shadow-intensity="1" exposure="1" environment-image="neutral" loading="eager" reveal="interaction"
+                    interaction-prompt="none" style="width: 280px; height: 60px; margin: 0; padding: 0;">
+                    <div slot="ar-button" class="activate-btn" style="margin: 0; height: 100%; width: 100%;">
+                        <span class="activate-text">Place in Space</span>
+                        <div class="play-icon-container">
+                            <svg class="play-icon" width="19" height="22" viewBox="0 0 19 22" fill="none"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    d="M18 8.93201C19.3333 9.70181 19.3333 11.6263 18 12.3961L3 21.0564C1.66667 21.8262 8.49539e-07 20.8639 9.16837e-07 19.3243L1.67394e-06 2.00381C1.74124e-06 0.464207 1.66667 -0.498043 3 0.271757L18 8.93201Z"
+                                    fill="currentColor" />
+                            </svg>
+                        </div>
                     </div>
-                </a>
+                    <div slot="poster" style="background: transparent;"></div>
+                </model-viewer>
             </div>
         </div>
     </div>
