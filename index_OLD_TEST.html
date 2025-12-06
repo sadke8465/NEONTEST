@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Experience</title>
+    <!-- Import model-viewer -->
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        h1 {
+            color: #00ffff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 40px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            font-size: 24px;
+        }
+
+        .menu-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+            max-width: 300px;
+            padding: 20px;
+            z-index: 10;
+        }
+
+        .btn {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 15px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 30px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            box-sizing: border-box;
+        }
+
+        .btn:hover {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+            border-color: #00ffff;
+            transform: scale(1.02);
+        }
+
+        /* Model Viewer Styling */
+        model-viewer {
+            width: 100%;
+            /* Match button width logic */
+            height: 60px;
+            /* Match button height approx */
+            display: block;
+            background-color: transparent;
+            --poster-color: transparent;
+        }
+
+        /* Custom AR Button in Slot */
+        .ar-btn {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 30px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Hide the default AR button if we use our own slot */
+        #default-ar-button {
+            display: none;
+        }
+
+        /* When model-viewer is not interacting, we still want it to look like a button container */
+        model-viewer::part(default-progress-bar) {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Choose Experience</h1>
+
+    <div class="menu-container">
+        <!-- Button 1: Switch Mode -->
+        <a href="selfie3.html?switch_mode=true" class="btn">
+            Switch Mode
+        </a>
+
+        <!-- Button 2: Place in Space (Native AR) -->
+        <model-viewer src="back_model.glb" ios-src="back_model.usdz" ar ar-modes="scene-viewer quick-look webxr"
+            ar-scale="auto" ar-placement="floor" camera-controls touch-action="pan-y" disable-zoom auto-rotate
+            shadow-intensity="1" exposure="1" environment-image="neutral" loading="eager" reveal="interaction"
+            interaction-prompt="none" style="width: 100%; height: 54px; margin: 0; padding: 0;">
+            <div slot="ar-button" class="btn" style="margin-top: 0; height: 100%; width: 100%; border-radius: 30px;">
+                Place in Space
+            </div>
+            <div slot="poster" style="background: transparent;"></div>
+        </model-viewer>
+    </div>
+
+</body>
+
+</html>

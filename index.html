@@ -4,134 +4,374 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Experience</title>
+    <title>Diesel AR Experience</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@600;700&display=swap" rel="stylesheet">
     <!-- Import model-viewer -->
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
     <style>
         body {
             margin: 0;
-            background-color: #000;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            padding: 0;
+            background-color: #fff;
             height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #fff;
+            /* Fixed height */
+            width: 100vw;
             overflow: hidden;
+            /* No scroll */
+            font-family: 'Assistant', sans-serif;
         }
 
-        h1 {
-            color: #00ffff;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 40px;
-            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-            font-size: 24px;
-        }
-
-        .menu-container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            width: 100%;
-            max-width: 300px;
-            padding: 20px;
-            z-index: 10;
-        }
-
-        .btn {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            padding: 15px 0;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(0, 255, 255, 0.3);
-            border-radius: 30px;
-            color: #fff;
-            text-decoration: none;
-            font-size: 16px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(5px);
-            box-sizing: border-box;
-        }
-
-        .btn:hover {
-            background: rgba(0, 255, 255, 0.2);
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
-            border-color: #00ffff;
-            transform: scale(1.02);
-        }
-
-        /* Model Viewer Styling */
-        model-viewer {
-            width: 100%;
-            /* Match button width logic */
-            height: 60px;
-            /* Match button height approx */
-            display: block;
-            background-color: transparent;
-            --poster-color: transparent;
-        }
-
-        /* Custom AR Button in Slot */
-        .ar-btn {
+        .container {
+            position: relative;
             width: 100%;
             height: 100%;
+            background-color: white;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bg-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+        }
+
+        /* Header takes full width naturally in flex column */
+        .header {
+            width: 100%;
+            background-color: #e40422;
+            padding-top: 60px;
+            /* Safe area top approx */
+            padding-bottom: 15px;
             display: flex;
             justify-content: center;
+            align-items: flex-end;
+            z-index: 2;
+            flex-shrink: 0;
+            /* Don't shrink */
+        }
+
+        .logo {
+            width: 108px;
+            height: auto;
+            display: block;
+        }
+
+        /* Main content area for the rest */
+        .main-content {
+            position: relative;
+            z-index: 1;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(0, 255, 255, 0.3);
-            border-radius: 30px;
-            color: #fff;
-            font-size: 16px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            justify-content: space-evenly;
+            /* Distribute space */
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            /* Allow internal scroll if absolutely needed on tiny screens, but try to fit */
+        }
+
+        .text-section {
+            text-align: center;
+            color: #e40422;
+            width: 100%;
+        }
+
+        .text-main {
+            font-weight: 600;
+            font-size: 18px;
+            line-height: 1.5;
+            direction: rtl;
+            margin: 0;
+        }
+
+        .placeholder-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            flex-shrink: 1;
+            /* Allow shrinking */
+            min-height: 0;
+            /* Flexbox fix */
+        }
+
+        .placeholder-img {
+            width: 100%;
+            max-width: 350px;
+            height: auto;
+            max-height: 40vh;
+            /* Limit height to fit screen */
+            object-fit: contain;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .buttons-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .activate-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
             cursor: pointer;
             transition: all 0.3s ease;
-            backdrop-filter: blur(5px);
+
+            /* Default State: Silver Metallic */
+            background: linear-gradient(180deg, #E0E0E0 0%, #B0B0B0 100%);
+            border-radius: 50px;
+            padding: 12px 30px;
+            /* Slightly smaller padding to fit */
+            width: 280px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            border: 1px solid #ccc;
         }
 
-        /* Hide the default AR button if we use our own slot */
-        #default-ar-button {
-            display: none;
+        .activate-text {
+            color: #e40422;
+            font-size: 28px;
+            /* Slightly smaller font */
+            font-weight: 700;
+            margin-right: 10px;
+            text-transform: uppercase;
+            transition: color 0.3s ease;
         }
 
-        /* When model-viewer is not interacting, we still want it to look like a button container */
-        model-viewer::part(default-progress-bar) {
-            display: none;
+        .play-icon {
+            width: 24px;
+            height: 24px;
+            color: #e40422;
+            transition: color 0.3s ease;
+        }
+
+        .play-icon-container {
+            transform: rotate(90deg);
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Hover/Active State: Red */
+        .activate-btn:hover,
+        .activate-btn:active {
+            background: #e40422;
+            transform: scale(1.02);
+            border-color: #e40422;
+        }
+
+        .activate-btn:hover .activate-text,
+        .activate-btn:active .activate-text {
+            color: white;
+        }
+
+        .activate-btn:hover .play-icon,
+        .activate-btn:active .play-icon {
+            color: white;
         }
     </style>
 </head>
 
 <body>
 
-    <h1>Choose Experience</h1>
+    <div class="container">
+        <!-- Background -->
+        <img src="page_bg.png" alt="" class="bg-image">
 
-    <div class="menu-container">
-        <!-- Button 1: Switch Mode -->
-        <a href="selfie3.html?switch_mode=true" class="btn">
-            Switch Mode
-        </a>
+        <!-- Header -->
+        <div class="header">
+            <img src="diesel_logo.png" alt="Diesel Logo" class="logo">
+        </div>
 
-        <!-- Button 2: Place in Space (Native AR) -->
-        <model-viewer src="back_model.glb" ios-src="back_model.usdz" ar ar-modes="scene-viewer quick-look webxr"
-            ar-scale="auto" ar-placement="floor" camera-controls touch-action="pan-y" disable-zoom auto-rotate
-            shadow-intensity="1" exposure="1" environment-image="neutral" loading="eager" reveal="interaction"
-            interaction-prompt="none" style="width: 100%; height: 54px; margin: 0; padding: 0;">
-            <div slot="ar-button" class="btn" style="margin-top: 0; height: 100%; width: 100%; border-radius: 30px;">
-                Place in Space
+        <div class="main-content">
+            <!-- Text -->
+            <div class="text-section">
+                <p class="text-main">
+                    צרו את ה-GIF שלכם<br>
+                    שתפו באינסטגרם<br>
+                    ותייגו<br>
+                    @diesel_il
+                </p>
             </div>
-            <div slot="poster" style="background: transparent;"></div>
-        </model-viewer>
+
+            <!-- 3D Model Container -->
+            <div class="placeholder-container" id="model-wrapper">
+                <div id="model-container" style="width: 100%; height: 100%; min-height: 300px;"></div>
+            </div>
+
+            <!-- Activate Buttons -->
+            <div class="buttons-container">
+                <a href="selfie3.html?switch_mode=true" class="activate-btn">
+                    <span class="activate-text">Switch Mode</span>
+                    <div class="play-icon-container">
+                        <svg class="play-icon" width="19" height="22" viewBox="0 0 19 22" fill="none"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                d="M18 8.93201C19.3333 9.70181 19.3333 11.6263 18 12.3961L3 21.0564C1.66667 21.8262 8.49539e-07 20.8639 9.16837e-07 19.3243L1.67394e-06 2.00381C1.74124e-06 0.464207 1.66667 -0.498043 3 0.271757L18 8.93201Z"
+                                fill="currentColor" />
+                        </svg>
+                    </div>
+                </a>
+
+                <model-viewer src="back_model.glb" ios-src="back_model.usdz" ar ar-modes="scene-viewer quick-look webxr"
+                    ar-scale="auto" ar-placement="floor" camera-controls touch-action="pan-y" disable-zoom auto-rotate
+                    shadow-intensity="1" exposure="1" environment-image="neutral" loading="eager" reveal="interaction"
+                    interaction-prompt="none" style="width: 280px; height: 60px; margin: 0; padding: 0;">
+                    <div slot="ar-button" class="activate-btn" style="margin: 0; height: 100%; width: 100%;">
+                        <span class="activate-text">Place in Space</span>
+                        <div class="play-icon-container">
+                            <svg class="play-icon" width="19" height="22" viewBox="0 0 19 22" fill="none"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    d="M18 8.93201C19.3333 9.70181 19.3333 11.6263 18 12.3961L3 21.0564C1.66667 21.8262 8.49539e-07 20.8639 9.16837e-07 19.3243L1.67394e-06 2.00381C1.74124e-06 0.464207 1.66667 -0.498043 3 0.271757L18 8.93201Z"
+                                    fill="currentColor" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div slot="poster" style="background: transparent;"></div>
+                </model-viewer>
+            </div>
+        </div>
     </div>
+
+    <!-- Three.js Implementation -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { createDenimFurMaterial } from './denimMaterial.js';
+
+        const container = document.getElementById('model-container');
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        // scene.background = new THREE.Color(0xffffff); // Optional: match bg or keep transparent
+
+        // Camera setup
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.z = 5;
+
+        // Renderer setup
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.enableZoom = false;
+        controls.enablePan = false;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 2.0;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        const backLight = new THREE.DirectionalLight(0xffffff, 1);
+        backLight.position.set(-5, 5, -5);
+        scene.add(backLight);
+
+        // Denim Material
+        const denimMaterial = createDenimFurMaterial(THREE);
+
+        // Load Model
+        const loader = new GLTFLoader();
+        loader.load('plain_d_test.gltf', (gltf) => {
+            const model = gltf.scene;
+            console.log('Model loaded:', model);
+
+            // Apply denim material to all meshes
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    console.log('Found mesh:', child.name);
+                    if (child.geometry.attributes.uv) {
+                        console.log('Mesh has UVs');
+                    } else {
+                        console.warn('Mesh MISSING UVs');
+                    }
+
+                    child.material = denimMaterial;
+                    console.log('Applied denim material to:', child.name);
+                }
+            });
+
+            // Center the model
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+
+            // Reset position to center
+            model.position.x += (model.position.x - center.x);
+            model.position.y += (model.position.y - center.y);
+            model.position.z += (model.position.z - center.z);
+
+            // Scale model to fit
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale = 3 / maxDim; // Adjust '3' based on desired size relative to camera z=5
+            model.scale.set(scale, scale, scale);
+
+            scene.add(model);
+        }, undefined, (error) => {
+            console.error('An error happened loading the model:', error);
+        });
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            if (!container) return;
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        });
+
+        // Animation loop
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const elapsedTime = clock.getElapsedTime();
+            denimMaterial.uniforms.uTime.value = elapsedTime;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
 
 </body>
 
