@@ -781,43 +781,47 @@
 
         function getCompositeCanvas() {
             const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
             const ctx = canvas.getContext('2d');
 
-            // 1. Background (Camera Feed)
-            ctx.drawImage(cameraFeedCanvas, 0, 0);
+            // 1. Background (Camera Feed) - Scale up to fit
+            ctx.drawImage(cameraFeedCanvas, 0, 0, canvas.width, canvas.height);
 
-            // 2. Back Model (if active)
+            // 2. Back Model (Three.js - already high res)
             if (!isNeonMode) {
-                ctx.drawImage(backModelCanvas, 0, 0);
+                ctx.drawImage(backModelCanvas, 0, 0, canvas.width, canvas.height);
             }
 
-            // 3. User (Segmented)
-            ctx.drawImage(outputCanvas, 0, 0);
+            // 3. User (Segmented) - Scale up
+            ctx.drawImage(outputCanvas, 0, 0, canvas.width, canvas.height);
 
-            // 4. Neon (if active)
+            // 4. Neon (Three.js - already high res)
             if (isNeonMode) {
-                ctx.drawImage(neonCanvas, 0, 0);
+                ctx.drawImage(neonCanvas, 0, 0, canvas.width, canvas.height);
             }
 
             return canvas;
         }
 
         function updateRecordingFrame() {
-            if (!isRecording || !recordingCtx) return;
+            if (!isRecording || !recordingCtx || !recordingCanvas) return;
+
+            const w = recordingCanvas.width;
+            const h = recordingCanvas.height;
 
             // 1. Background
-            recordingCtx.drawImage(cameraFeedCanvas, 0, 0);
+            recordingCtx.drawImage(cameraFeedCanvas, 0, 0, w, h);
 
             // 2. Back Model
-            if (!isNeonMode) recordingCtx.drawImage(backModelCanvas, 0, 0);
+            if (!isNeonMode) recordingCtx.drawImage(backModelCanvas, 0, 0, w, h);
 
             // 3. User
-            recordingCtx.drawImage(outputCanvas, 0, 0);
+            recordingCtx.drawImage(outputCanvas, 0, 0, w, h);
 
             // 4. Neon
-            if (isNeonMode) recordingCtx.drawImage(neonCanvas, 0, 0);
+            if (isNeonMode) recordingCtx.drawImage(neonCanvas, 0, 0, w, h);
 
             requestAnimationFrame(updateRecordingFrame);
         }
@@ -878,8 +882,9 @@
             captureBtn.classList.add('recording');
 
             recordingCanvas = document.createElement('canvas');
-            recordingCanvas.width = width;
-            recordingCanvas.height = height;
+            const dpr = window.devicePixelRatio || 1;
+            recordingCanvas.width = width * dpr;
+            recordingCanvas.height = height * dpr;
             recordingCtx = recordingCanvas.getContext('2d');
 
             const stream = recordingCanvas.captureStream(30); // 30 FPS

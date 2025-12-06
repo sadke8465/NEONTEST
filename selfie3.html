@@ -591,8 +591,8 @@
 
         function getCompositeCanvas() {
             const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
+            canvas.width = threeCanvas.width;
+            canvas.height = threeCanvas.height;
             const ctx = canvas.getContext('2d');
 
             // Draw the current three.js scene
@@ -666,8 +666,8 @@
             captureBtn.classList.add('recording');
 
             recordingCanvas = document.createElement('canvas');
-            recordingCanvas.width = width;
-            recordingCanvas.height = height;
+            recordingCanvas.width = threeCanvas.width;
+            recordingCanvas.height = threeCanvas.height;
             recordingCtx = recordingCanvas.getContext('2d');
 
             const stream = recordingCanvas.captureStream(30); // 30 FPS
