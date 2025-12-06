@@ -595,8 +595,8 @@
             canvas.height = threeCanvas.height;
             const ctx = canvas.getContext('2d');
 
-            // Draw the current three.js scene
-            ctx.drawImage(threeCanvas, 0, 0);
+            // Draw the current three.js scene (already at correct buffer resolution)
+            ctx.drawImage(threeCanvas, 0, 0, canvas.width, canvas.height);
 
             return canvas;
         }
@@ -605,7 +605,7 @@
             if (!isRecording || !recordingCtx) return;
 
             // Draw the three.js canvas (which already has video + model + effects)
-            recordingCtx.drawImage(threeCanvas, 0, 0);
+            recordingCtx.drawImage(threeCanvas, 0, 0, recordingCanvas.width, recordingCanvas.height);
 
             requestAnimationFrame(updateRecordingFrame);
         }
