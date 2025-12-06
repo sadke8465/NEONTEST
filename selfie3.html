@@ -272,7 +272,7 @@
         const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
         camera.position.set(0, 0, 10); // Match Selfie Mode 1 Camera Z
 
-        const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true });
+        const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true, preserveDrawingBuffer: true });
         renderer.setSize(width, height);
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.toneMapping = THREE.NoToneMapping;

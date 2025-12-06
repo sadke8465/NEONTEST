@@ -335,7 +335,7 @@
         const neonCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
         neonCamera.position.set(0, 0, 10);
 
-        const neonRenderer = new THREE.WebGLRenderer({ canvas: neonCanvas, alpha: true, antialias: true });
+        const neonRenderer = new THREE.WebGLRenderer({ canvas: neonCanvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
         neonRenderer.setSize(width, height);
         neonRenderer.setPixelRatio(window.devicePixelRatio);
         neonRenderer.toneMapping = THREE.NoToneMapping;
@@ -478,7 +478,7 @@
         const backCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
         backCamera.position.set(0, 0, 5);
 
-        const backRenderer = new THREE.WebGLRenderer({ canvas: backModelCanvas, alpha: true, antialias: true });
+        const backRenderer = new THREE.WebGLRenderer({ canvas: backModelCanvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
         backRenderer.setSize(width, height);
         backRenderer.setPixelRatio(window.devicePixelRatio);
         backRenderer.toneMapping = THREE.ACESFilmicToneMapping;
