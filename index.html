@@ -265,7 +265,6 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { createDenimFurMaterial } from './denimMaterial.js';
 
         const container = document.getElementById('model-container');
 
@@ -304,29 +303,10 @@
         backLight.position.set(-5, 5, -5);
         scene.add(backLight);
 
-        // Denim Material
-        const denimMaterial = createDenimFurMaterial(THREE);
-
         // Load Model
         const loader = new GLTFLoader();
-        loader.load('plain_d_test.gltf', (gltf) => {
+        loader.load('back_model.glb', (gltf) => {
             const model = gltf.scene;
-            console.log('Model loaded:', model);
-
-            // Apply denim material to all meshes
-            model.traverse((child) => {
-                if (child.isMesh) {
-                    console.log('Found mesh:', child.name);
-                    if (child.geometry.attributes.uv) {
-                        console.log('Mesh has UVs');
-                    } else {
-                        console.warn('Mesh MISSING UVs');
-                    }
-
-                    child.material = denimMaterial;
-                    console.log('Applied denim material to:', child.name);
-                }
-            });
 
             // Center the model
             const box = new THREE.Box3().setFromObject(model);
@@ -360,13 +340,8 @@
         });
 
         // Animation loop
-        const clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
-
-            const elapsedTime = clock.getElapsedTime();
-            denimMaterial.uniforms.uTime.value = elapsedTime;
-
             controls.update();
             renderer.render(scene, camera);
         }
