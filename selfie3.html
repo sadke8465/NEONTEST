@@ -190,7 +190,182 @@
             opacity: 1;
             stroke-dashoffset: 0;
             transition: stroke-dashoffset 10s linear;
-            /* Max video length visual */
+        }
+
+        /* PHOTOBOOTH MODE STYLES */
+
+        #photobooth_btn {
+            position: absolute;
+            top: 60px;
+            /* Below status/back button area */
+            right: 10px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-family: sans-serif;
+            font-size: 12px;
+            text-transform: uppercase;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: all 0.3s ease;
+        }
+
+        #photobooth_btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        #photobooth_overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        #photobooth_overlay.active {
+            pointer-events: all;
+            opacity: 1;
+        }
+
+        #photobooth_black_drop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+        }
+
+        #printer_slot {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 320px;
+            height: 20px;
+            background: #111;
+            border-bottom: 2px solid #333;
+            z-index: 2;
+        }
+
+        #polaroid_container {
+            position: absolute;
+            top: -600px;
+            /* Start off-screen */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            background: #fff;
+            padding: 15px 15px 50px 15px;
+            /* Polaroid bottom heavy */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            /* transform will be handled by animation */
+        }
+
+        #polaroid_image {
+            width: 100%;
+            aspect-ratio: 9/16;
+            /* Or dynamic */
+            background: #000;
+            display: block;
+            filter: contrast(1.1) saturate(1.1);
+            /* Vintage pop */
+        }
+
+        /* Animation Classes */
+        .printing {
+            animation: printScroll 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        @keyframes printScroll {
+            0% {
+                top: -600px;
+            }
+
+            10% {
+                top: -600px;
+            }
+
+            /* Pause before start */
+            /* Pulses */
+            20% {
+                top: -450px;
+            }
+
+            30% {
+                top: -450px;
+            }
+
+            40% {
+                top: -300px;
+            }
+
+            50% {
+                top: -300px;
+            }
+
+            60% {
+                top: -150px;
+            }
+
+            70% {
+                top: -150px;
+            }
+
+            80% {
+                top: 50px;
+            }
+
+            /* Final position, roughly centered top-ish */
+            100% {
+                top: 10%;
+                transform: translateX(-50%) rotate(-3deg);
+            }
+
+            /* Land with skew */
+        }
+
+        #post_capture_ui {
+            position: absolute;
+            bottom: 50px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            opacity: 0;
+            transition: opacity 1s ease 2.5s;
+            /* Delay until after print */
+        }
+
+        #post_capture_ui.visible {
+            opacity: 1;
+        }
+
+        .action_btn {
+            background: white;
+            color: black;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-family: sans-serif;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            text-transform: uppercase;
+        }
+
+        .action_btn.secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid white;
         }
     </style>
 
@@ -210,6 +385,20 @@
         <div id="transition_overlay"></div>
         <div id="status">Initializing...</div>
         <a href="index.html" id="back_btn">Back</a>
+        <div id="photobooth_btn">Photobooth Mode</div>
+
+        <!-- Photobooth Overlay -->
+        <div id="photobooth_overlay">
+            <div id="photobooth_black_drop"></div>
+            <!-- <div id="printer_slot"></div> Optional visual anchor -->
+            <div id="polaroid_container">
+                <img id="polaroid_image" src="" alt="Capture">
+            </div>
+            <div id="post_capture_ui">
+                <button id="pb_take_again" class="action_btn secondary">Take Again</button>
+                <button id="pb_share" class="action_btn">Share Capture</button>
+            </div>
+        </div>
         <div id="switch_btn">SWITCH EFFECT</div>
 
         <canvas id="three_canvas"></canvas>
@@ -748,6 +937,69 @@
         captureBtn.addEventListener('mouseleave', () => {
             if (pressTimer) clearTimeout(pressTimer);
             if (isRecording) stopRecording();
+        });
+
+
+        // =========================================================
+        //  === PHOTOBOOTH MODE LOGIC ===
+        // =========================================================
+
+        const photoboothBtn = document.getElementById('photobooth_btn');
+        const photoboothOverlay = document.getElementById('photobooth_overlay');
+        const polaroidContainer = document.getElementById('polaroid_container');
+        const polaroidImage = document.getElementById('polaroid_image');
+        const postCaptureUi = document.getElementById('post_capture_ui');
+        const pbTakeAgainBtn = document.getElementById('pb_take_again');
+        const pbShareBtn = document.getElementById('pb_share');
+
+        let currentPhotoBlob = null;
+
+        photoboothBtn.addEventListener('click', () => {
+            // 1. Capture immediately
+            const canvas = getCompositeCanvas();
+
+            // 2. Fade to black
+            photoboothOverlay.classList.add('active');
+
+            canvas.toBlob(blob => {
+                currentPhotoBlob = blob;
+                const url = URL.createObjectURL(blob);
+
+                // Set image
+                polaroidImage.src = url;
+
+                // 3. Start Animation Sequence
+                // Reset animation
+                polaroidContainer.classList.remove('printing');
+                void polaroidContainer.offsetWidth; // trigger reflow
+
+                // Add animation class
+                polaroidContainer.classList.add('printing');
+
+                // Show UI Buttons after animation
+                postCaptureUi.classList.add('visible');
+
+            }, 'image/png');
+        });
+
+        pbTakeAgainBtn.addEventListener('click', () => {
+            // Reset UI
+            postCaptureUi.classList.remove('visible');
+            photoboothOverlay.classList.remove('active');
+            polaroidContainer.classList.remove('printing');
+
+            // Cleanup
+            if (polaroidImage.src) {
+                URL.revokeObjectURL(polaroidImage.src);
+                polaroidImage.src = '';
+            }
+            currentPhotoBlob = null;
+        });
+
+        pbShareBtn.addEventListener('click', () => {
+            if (currentPhotoBlob) {
+                shareMedia(currentPhotoBlob, `photobooth_${Date.now()}.png`);
+            }
         });
 
     </script>
