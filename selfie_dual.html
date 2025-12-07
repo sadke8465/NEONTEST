@@ -498,7 +498,7 @@
         let backModel = null;
         let backMixer = null;
 
-        loader.load('./back_model.glb', function (gltf) {
+        loader.load('./blender_test.glb', function (gltf) {
             backModel = gltf.scene;
 
             const box = new THREE.Box3().setFromObject(backModel);
