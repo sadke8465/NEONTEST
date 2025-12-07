@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Diesel AR Experience</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,11 +27,14 @@
             padding: 0;
             background-color: #fff;
             height: 100vh;
-            /* Fixed height */
+            /* Fallback */
+            height: 100dvh;
+            /* Mobile viewport height */
             width: 100vw;
             overflow: hidden;
             /* No scroll */
             font-family: 'Assistant Custom', sans-serif;
+            /* Safe area handling for overall container if needed, but handled in children */
         }
 
         /* Loading Screen */
@@ -76,24 +80,27 @@
         .header {
             width: 100%;
             background-color: #e40422;
-            padding-top: 60px;
-            /* Safe area top approx */
-            padding-bottom: 15px;
+            padding-top: max(50px, env(safe-area-inset-top) + 20px);
+            /* Safe area logic */
+            padding-bottom: 20px;
+            /* Slightly more space */
             display: flex;
             justify-content: center;
             align-items: flex-end;
             z-index: 2;
             flex-shrink: 0;
-            /* Don't shrink */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            /* Subtle shadow for depth */
         }
 
         .logo {
-            width: 108px;
+            width: 110px;
+            /* Slight adjustment */
             height: auto;
             display: block;
         }
 
-        /* Main content area for the rest */
+        /* Main content area */
         .main-content {
             position: relative;
             z-index: 1;
@@ -101,65 +108,72 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: space-evenly;
-            /* Distribute space */
+            justify-content: flex-start;
+            /* Start from top */
             width: 100%;
             max-width: 500px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 0 20px;
             box-sizing: border-box;
-            overflow-y: auto;
-            /* Allow internal scroll if absolutely needed on tiny screens, but try to fit */
+            overflow: hidden;
+            /* Prevent scrolling */
         }
 
         .text-section {
             text-align: center;
             color: #e40422;
             width: 100%;
+            margin-top: 25px;
+            /* Spacing from header */
+            flex-shrink: 0;
+            z-index: 5;
         }
 
         .text-top {
             font-weight: 600;
-            font-size: 14px;
-            line-height: 1.5;
+            font-size: 15px;
+            /* Slightly larger */
+            line-height: 1.4;
             direction: rtl;
             margin: 0;
             font-family: 'Assistant Custom', sans-serif;
+            letter-spacing: -0.5px;
         }
 
         .text-bottom {
             font-weight: 700;
-            font-size: 23px;
-            line-height: 1.5;
+            font-size: 24px;
+            /* Slightly larger */
+            line-height: 1.2;
             direction: rtl;
-            margin: 10px 0 0 0;
+            margin: 5px 0 0 0;
+            /* Tighten up */
             font-family: 'Assistant Custom', sans-serif;
         }
 
         .english-text {
             font-family: 'Franklin Gothic Ex Cn', sans-serif;
+            font-weight: 700;
         }
 
         .placeholder-container {
             width: 100%;
+            flex-grow: 1;
+            /* Take remaining space */
             display: flex;
             justify-content: center;
-            flex-shrink: 1;
-            /* Allow shrinking */
-            min-height: 0;
-            /* Flexbox fix */
+            align-items: center;
+            position: relative;
+            /* Adjust negative margins to pull model up/down if needed */
         }
 
-        .placeholder-img {
+        /* Adjust model container to fill space but not overflow */
+        #model-container {
             width: 100%;
-            max-width: 350px;
-            height: auto;
-            max-height: 40vh;
-            /* Limit height to fit screen */
-            object-fit: contain;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            height: 100%;
+            min-height: 300px;
         }
+
 
         .buttons-container {
             display: flex;
@@ -168,6 +182,9 @@
             width: 100%;
             align-items: center;
             flex-shrink: 0;
+            margin-bottom: max(30px, env(safe-area-inset-bottom) + 10px);
+            /* Safe area logic */
+            z-index: 10;
         }
 
         .activate-btn {
@@ -179,51 +196,56 @@
             transition: all 0.2s ease;
 
             /* Default State: Silver Metallic */
-            background: linear-gradient(180deg, #DADADA 0%, #AFAFAF 100%);
-            border-radius: 12px;
-            padding: 10px 0;
-            /* Fixed height feel */
-            width: 280px;
-            height: 60px;
-            /* Explicit height */
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-            border: none;
+            background: linear-gradient(180deg, #E6E6E6 0%, #A0A0A0 100%);
+            /* Lighter silver */
+            border-radius: 15px;
+            /* Softer radius */
+            padding: 0;
+            width: 290px;
+            /* Slightly wider */
+            height: 65px;
+            /* Taller */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.4);
             position: relative;
         }
 
         .activate-text {
             color: #d8001d;
-            /* Slightly deeper red */
-            font-size: 38px;
-            /* Larger text */
+            font-size: 36px;
             font-weight: 700;
-            margin-right: 15px;
+            margin-right: 12px;
             font-family: 'Franklin Gothic Ex Cn', sans-serif;
-            letter-spacing: -1px;
-            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
+            padding-top: 4px;
+            /* Optical vertical alignment */
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
         }
 
         .play-icon {
-            width: 28px;
-            height: 28px;
+            width: 24px;
+            height: 24px;
             color: #d8001d;
-            filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.4));
+            filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.8));
+            fill: currentColor;
         }
 
         .play-icon-container {
-            transform: rotate(90deg);
-            width: 28px;
-            height: 28px;
+            /* Removed rotation */
             display: flex;
             align-items: center;
             justify-content: center;
+            padding-top: 4px;
+            /* optical align with text */
         }
 
         /* Active/Clicked State: Red */
         .activate-btn:active {
             background: #d8001d;
-            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
             transform: scale(0.98);
+            border: none;
         }
 
         .activate-btn:active .activate-text {

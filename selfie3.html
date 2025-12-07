@@ -7,6 +7,10 @@
     <title>Selfie Mode 3</title>
     <!-- Import model-viewer -->
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Covered+By+Your+Grace&display=swap" rel="stylesheet">
     <style>
         body {
             margin: 0;
@@ -177,7 +181,7 @@
             transform: translateX(-50%);
             width: 300px;
             background: #fff;
-            padding: 15px 15px 50px 15px;
+            padding: 15px 15px 80px 15px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
 
@@ -187,6 +191,20 @@
             background: #000;
             display: block;
             filter: contrast(1.1) saturate(1.1);
+        }
+
+        #polaroid_text {
+            position: absolute;
+            bottom: 25px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-family: "Covered By Your Grace", cursive;
+            font-size: 28px;
+            color: #222;
+            transform: rotate(-2deg) skewX(-2deg);
+            opacity: 0.85;
+            white-space: nowrap;
         }
 
         /* Animation Classes */
@@ -300,6 +318,7 @@
             <div id="photobooth_black_drop"></div>
             <div id="polaroid_container">
                 <img id="polaroid_image" src="" alt="Capture">
+                <div id="polaroid_text"></div>
             </div>
             <div id="post_capture_ui">
                 <button id="pb_take_again" class="action_btn secondary">Take Again</button>
@@ -470,6 +489,12 @@
         // =========================================================
 
         async function startCamera() {
+            // Stop existing tracks to ensure clean restart
+            if (videoElement.srcObject) {
+                const tracks = videoElement.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+            }
+
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
@@ -479,12 +504,45 @@
                     }
                 });
                 videoElement.srcObject = stream;
-                videoElement.play();
+                await videoElement.play();
             } catch (err) {
                 console.error("Error accessing camera:", err);
             }
         }
         startCamera();
+
+        // Re-initialize camera when returning to the tab (e.g. from AR view)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                // Determine if we need to restart
+                const stream = videoElement.srcObject;
+                const isPaused = videoElement.paused;
+                const isEnded = videoElement.ended;
+
+                let needsRestart = false;
+
+                if (!stream || !stream.active) {
+                    needsRestart = true;
+                } else if (isPaused || isEnded) {
+                    // Try to resume first
+                    videoElement.play().catch(() => {
+                        console.log("Resume failed, restarting camera...");
+                        startCamera();
+                    });
+                } else {
+                    // Check individual tracks
+                    const tracks = stream.getVideoTracks();
+                    if (tracks.length > 0 && (tracks[0].readyState === 'ended' || tracks[0].muted)) {
+                        needsRestart = true;
+                    }
+                }
+
+                if (needsRestart) {
+                    console.log("Camera needs restart after visibility change.");
+                    startCamera();
+                }
+            }
+        });
 
         // =========================================================
         //  === POSITIONING LOGIC ===
@@ -662,6 +720,11 @@
                 currentPhotoBlob = blob;
                 const url = URL.createObjectURL(blob);
                 polaroidImage.src = url;
+
+                // Update text with current date
+                const now = new Date();
+                const dateStr = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
+                document.getElementById('polaroid_text').innerText = `DIESEL TEST ${dateStr}`;
 
                 // 3. Start Animation Sequence
                 polaroidContainer.classList.remove('printing');
