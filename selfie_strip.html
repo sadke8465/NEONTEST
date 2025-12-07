@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selfie Mode 3</title>
+    <!-- Import model-viewer -->
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Covered+By+Your+Grace&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: monospace;
+        }
+
+        #container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 80%;
+            /* Cropped viewport */
+            overflow: hidden;
+            border-bottom: 3px solid #222;
+        }
+
+        #three_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .input_video {
+            display: none;
+        }
+
+        #status {
+            position: absolute;
+            color: cyan;
+            z-index: 3;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 12px;
+            border-radius: 4px;
+            pointer-events: none;
+            display: none;
+            /* Hidden unless needed for debug */
+        }
+
+        /* Back button (Left Top Arrow) */
+        #back_btn {
+            position: fixed;
+            /* Fixed to window */
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            backdrop-filter: blur(4px);
+            text-decoration: none;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* Capture Button (Middle Bottom) */
+        #capture_container {
+            position: fixed;
+            /* Fixed to window, in black area */
+            bottom: 3%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #capture_btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            border: 4px solid white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.2s;
+        }
+
+        #capture_btn:active {
+            transform: scale(0.95);
+        }
+
+        #capture_inner {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: white;
+        }
+
+        #capture_counter {
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        /* Switch Camera / AR Button (Right Bottom) */
+        #ar_switch_container {
+            position: fixed;
+            /* Fixed to window */
+            bottom: 5%;
+            right: 20px;
+            z-index: 50;
+            width: 50px;
+            height: 50px;
+        }
+
+        #ar_switch_btn {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            color: white;
+        }
+
+        /* Icon Styles */
+        .icon {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+        /* PHOTOBOOTH MODE STYLES */
+        #photobooth_overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        #photobooth_overlay.active {
+            pointer-events: all;
+            opacity: 1;
+        }
+
+        #photobooth_black_drop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+        }
+
+        #polaroid_container {
+            position: absolute;
+            top: -2000px;
+            /* Start way above */
+            left: 50%;
+            transform: translateX(-50%) rotate(0deg);
+            width: 160px;
+            /* Strip width */
+            background: #fff;
+            padding: 10px 10px 40px 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #polaroid_image {
+            width: 100%;
+            height: auto;
+            background: #eee;
+            display: block;
+            filter: contrast(1.1) saturate(1.1);
+        }
+
+        #polaroid_text {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-family: "Covered By Your Grace", cursive;
+            font-size: 18px;
+            color: #222;
+            transform: none;
+            opacity: 0.9;
+            white-space: nowrap;
+        }
+
+        /* Animation Classes */
+        .printing {
+            animation: printScroll 4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        @keyframes printScroll {
+            0% {
+                top: -2000px;
+                transform: translateX(-50%) rotate(0deg);
+            }
+
+            100% {
+                top: 50px;
+                transform: translateX(-50%) rotate(-2deg) scale(0.6);
+            }
+        }
+
+        #post_capture_ui {
+            position: absolute;
+            bottom: 50px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            opacity: 0;
+            transition: opacity 1s ease 2.5s;
+        }
+
+        #post_capture_ui.visible {
+            opacity: 1;
+        }
+
+        .action_btn {
+            background: white;
+            color: black;
+            border: none;
+            width: 60px;
+            height: 60px;
+            padding: 0;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+        }
+
+        .action_btn:active {
+            transform: scale(0.95);
+        }
+
+        .action_btn.secondary {
+            background: white;
+            color: black;
+            border: none;
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+
+    <div id="container">
+        <div id="status">Initializing...</div>
+
+        <!-- 3. Left Arrow Icon Button -->
+        <a href="index.html" id="back_btn">
+            <svg class="icon" viewBox="0 0 24 24">
+                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+            </svg>
+        </a>
+
+        <!-- Photobooth Overlay -->
+        <div id="photobooth_overlay">
+            <div id="photobooth_black_drop"></div>
+            <div id="polaroid_container">
+                <img id="polaroid_image" src="" alt="Capture">
+                <div id="polaroid_text"></div>
+            </div>
+            <div id="post_capture_ui">
+                <button id="pb_take_again" class="action_btn secondary" aria-label="Take Again">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path
+                            d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                    </svg>
+                </button>
+                <button id="pb_share" class="action_btn" aria-label="Share">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M16 5l-4-4-4 4m4-4v13m7-3v5h-14v-5" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <canvas id="three_canvas"></canvas>
+
+        <!-- 1. Capture Button (Middle Bottom) -->
+        <div id="capture_container">
+            <div id="capture_btn">
+                <div id="capture_inner"></div>
+            </div>
+            <div id="capture_counter">0 / 3</div>
+        </div>
+
+        <!-- 2. Switch Camera Icon Button (Right Bottom) - AR Placement -->
+        <div id="ar_switch_container">
+            <div id="ar_switch_btn">
+                <!-- Switch Camera Icon -->
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path
+                        d="M9 3L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2h-3.17L15 3H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z" />
+                    <path d="M12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+                </svg>
+            </div>
+        </div>
+
+        <!-- Hidden Model Viewer to trigger AR -->
+        <model-viewer id="ar_model_viewer" src="blender_test.glb" ios-src="blender_test.glb.usdz" ar
+            ar-modes="scene-viewer quick-look webxr" ar-scale="auto" ar-placement="floor" camera-controls
+            touch-action="pan-y" disable-zoom auto-rotate shadow-intensity="1" exposure="1" environment-image="neutral"
+            loading="eager" reveal="interaction" interaction-prompt="none"
+            style="position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none;">
+        </model-viewer>
+
+        <a id="download_anchor" style="display:none"></a>
+    </div>
+    <video class="input_video" playsinline muted></video>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // =========================================================
+        //  === CONFIGURATION ===
+        // =========================================================
+
+        const MODEL_WIDTH_PCT = 0.9;
+        const ROTATION_FIX_Y = 0.0;
+        const VERTICAL_OFFSET = 0.0;
+        const HORIZONTAL_OFFSET = 0.0;
+
+        const BLOOM_THRESHOLD = 1.5;
+        const BLOOM_STRENGTH = 2.0;
+        const BLOOM_RADIUS = 0.5;
+
+        const NEON_COLOR = 0xEB292D;
+        const NEON_INTENSITY_SCALAR = 10.0;
+
+        // =========================================================
+        //  === SETUP ===
+        // =========================================================
+
+        const threeCanvas = document.getElementById('three_canvas');
+        const statusText = document.getElementById('status');
+        const videoElement = document.querySelector('.input_video');
+        const container = document.getElementById('container'); // Ref to container
+
+        let width = container.clientWidth;
+        let height = container.clientHeight;
+
+        // =========================================================
+        //  === THREE.JS SCENE ===
+        // =========================================================
+
+        const scene = new THREE.Scene();
+
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+        camera.position.set(0, 0, 10);
+
+        const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true, preserveDrawingBuffer: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.NoToneMapping;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+        // =========================================================
+        //  === VIDEO BACKGROUND ===
+        // =========================================================
+
+        const videoTexture = new THREE.VideoTexture(videoElement);
+        videoTexture.colorSpace = THREE.SRGBColorSpace;
+
+        const videoGeometry = new THREE.PlaneGeometry(1, 1);
+        const videoMaterial = new THREE.MeshStandardMaterial({
+            map: videoTexture,
+            side: THREE.DoubleSide,
+            roughness: 1,
+            metalness: 0,
+            color: 0xffffff
+        });
+        const videoPlane = new THREE.Mesh(videoGeometry, videoMaterial);
+        videoPlane.position.z = -10;
+        scene.add(videoPlane);
+
+        // =========================================================
+        //  === NEON SIGN ===
+        // =========================================================
+
+        const loader = new GLTFLoader();
+        let loadedModel = null;
+        let pointLight = null;
+
+        const neonMaterial = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(NEON_COLOR).multiplyScalar(NEON_INTENSITY_SCALAR)
+        });
+
+        loader.load('./model.gltf', function (gltf) {
+            loadedModel = gltf.scene;
+
+            loadedModel.traverse((child) => {
+                if (child.isMesh) child.material = neonMaterial;
+            });
+
+            const box = new THREE.Box3().setFromObject(loadedModel);
+            const center = box.getCenter(new THREE.Vector3());
+            loadedModel.position.sub(center);
+
+            pointLight = new THREE.PointLight(NEON_COLOR, 100, 50);
+            pointLight.position.set(0, 0, 2);
+            loadedModel.add(pointLight);
+
+            scene.add(loadedModel);
+            fitModelToCamera();
+
+        }, undefined, function (error) {
+            console.error(error);
+        });
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+        scene.add(ambientLight);
+
+        // =========================================================
+        //  === POST-PROCESSING ===
+        // =========================================================
+
+        const renderScene = new RenderPass(scene, camera);
+
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 1.5, 0.4, 0.85);
+        bloomPass.threshold = BLOOM_THRESHOLD;
+        bloomPass.strength = BLOOM_STRENGTH;
+        bloomPass.radius = BLOOM_RADIUS;
+
+        const renderTarget = new THREE.WebGLRenderTarget(width, height, {
+            type: THREE.HalfFloatType,
+            format: THREE.RGBAFormat,
+        });
+
+        const composer = new EffectComposer(renderer, renderTarget);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // =========================================================
+        //  === CAMERA SETUP ===
+        // =========================================================
+
+        async function startCamera() {
+            // Stop existing tracks to ensure clean restart
+            if (videoElement.srcObject) {
+                const tracks = videoElement.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                videoElement.srcObject = stream;
+                await videoElement.play();
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+            }
+        }
+        startCamera();
+
+        // Re-initialize camera when returning to the tab (e.g. from AR view)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                // Determine if we need to restart
+                const stream = videoElement.srcObject;
+                const isPaused = videoElement.paused;
+                const isEnded = videoElement.ended;
+
+                let needsRestart = false;
+
+                if (!stream || !stream.active) {
+                    needsRestart = true;
+                } else if (isPaused || isEnded) {
+                    // Try to resume first
+                    videoElement.play().catch(() => {
+                        console.log("Resume failed, restarting camera...");
+                        startCamera();
+                    });
+                } else {
+                    // Check individual tracks
+                    const tracks = stream.getVideoTracks();
+                    if (tracks.length > 0 && (tracks[0].readyState === 'ended' || tracks[0].muted)) {
+                        needsRestart = true;
+                    }
+                }
+
+                if (needsRestart) {
+                    console.log("Camera needs restart after visibility change.");
+                    startCamera();
+                }
+            }
+        });
+
+        // =========================================================
+        //  === POSITIONING LOGIC ===
+        // =========================================================
+
+        function fitModelToCamera() {
+            if (!loadedModel) return;
+
+            loadedModel.rotation.set(0, 0, 0);
+            loadedModel.scale.set(1, 1, 1);
+            loadedModel.position.set(0, 0, 0);
+            loadedModel.updateMatrixWorld(true);
+
+            const dist = camera.position.z;
+            const vFOV = THREE.MathUtils.degToRad(camera.fov);
+            const visibleHeight = 2 * Math.tan(vFOV / 2) * dist;
+            const visibleWidth = visibleHeight * camera.aspect;
+
+            const box = new THREE.Box3().setFromObject(loadedModel);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+
+            let scaleFactor = (visibleWidth / size.x) * MODEL_WIDTH_PCT;
+            loadedModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+            const scaledMaxZ = box.max.z * scaleFactor;
+            loadedModel.position.z = -scaledMaxZ;
+
+            const scaledTopY = box.max.y * scaleFactor;
+            const targetTopY = visibleHeight / 2;
+            const topPadding = visibleHeight * 0.05;
+
+            loadedModel.position.y = (targetTopY - scaledTopY - topPadding) + VERTICAL_OFFSET;
+
+            const scaledCenterX = center.x * scaleFactor;
+            loadedModel.position.x = -scaledCenterX + HORIZONTAL_OFFSET;
+
+            loadedModel.rotation.y = ROTATION_FIX_Y;
+        }
+
+        function updateVideoPlane() {
+            if (videoElement.readyState < videoElement.HAVE_ENOUGH_DATA) return;
+
+            const videoW = videoElement.videoWidth;
+            const videoH = videoElement.videoHeight;
+            const videoAspect = videoW / videoH;
+            const screenAspect = width / height;
+
+            const distance = camera.position.z - videoPlane.position.z;
+            const vFOV = THREE.MathUtils.degToRad(camera.fov);
+            const visibleHeight = 2 * Math.tan(vFOV / 2) * distance;
+            const visibleWidth = visibleHeight * camera.aspect;
+
+            let scaleX, scaleY;
+
+            if (screenAspect > videoAspect) {
+                scaleX = visibleWidth;
+                scaleY = visibleWidth / videoAspect;
+            } else {
+                scaleY = visibleHeight;
+                scaleX = visibleHeight * videoAspect;
+            }
+
+            videoPlane.scale.set(-scaleX, scaleY, 1);
+        }
+
+        function handleResize() {
+            width = container.clientWidth;
+            height = container.clientHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+
+            fitModelToCamera();
+            updateVideoPlane();
+        }
+
+        window.addEventListener('resize', handleResize);
+        videoElement.addEventListener('loadedmetadata', updateVideoPlane);
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.005;
+
+            const flicker = Math.random() > 0.9 ? Math.random() * 0.5 : 0;
+            const pulse = Math.sin(time * 2) * 0.1;
+
+            bloomPass.strength = 2.0 + pulse + flicker;
+
+            if (pointLight) {
+                pointLight.intensity = 100.0 + (pulse * 20) + (flicker * 30);
+            }
+
+            updateVideoPlane();
+            composer.render();
+        }
+        animate();
+
+        // =========================================================
+        //  === CAPTURE & PHOTOBOOTH LOGIC ===
+        // =========================================================
+
+        const captureBtn = document.getElementById('capture_btn');
+        const captureCounter = document.getElementById('capture_counter');
+        const downloadAnchor = document.getElementById('download_anchor');
+        const photoboothOverlay = document.getElementById('photobooth_overlay');
+        const polaroidContainer = document.getElementById('polaroid_container');
+        const polaroidImage = document.getElementById('polaroid_image');
+        const postCaptureUi = document.getElementById('post_capture_ui');
+        const pbTakeAgainBtn = document.getElementById('pb_take_again');
+        const pbShareBtn = document.getElementById('pb_share');
+
+        let currentPhotoBlob = null;
+        let capturedImages = [];
+        const MAX_PHOTOS = 3;
+
+        // Helper: Capture Frame from Canvas
+        async function captureFrame() {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = threeCanvas.width;
+                canvas.height = threeCanvas.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(threeCanvas, 0, 0, canvas.width, canvas.height);
+
+                // Flip horizontally if desired? Assuming standard selfie mirroring is handled by CSS on video, but here we read from WebGL.
+                // The main code doesn't explicitly mirror the canvas, so it replicates what's seen.
+
+                canvas.toBlob(blob => {
+                    resolve(blob);
+                }, 'image/png');
+            });
+        }
+
+        // Helper: Generate Strip
+        async function generateStrip(blobs) {
+            const imgObjects = await Promise.all(blobs.map(blob => {
+                return new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.src = URL.createObjectURL(blob);
+                });
+            }));
+
+            // Strip Config
+            const PHOTO_WIDTH = imgObjects[0].width;
+            const PHOTO_HEIGHT = imgObjects[0].height;
+            const PADDING = 40; // px
+            const TEXT_AREA = 150; // px
+            const STRIP_WIDTH = PHOTO_WIDTH + (PADDING * 2);
+            const STRIP_HEIGHT = (PHOTO_HEIGHT * blobs.length) + (PADDING * (blobs.length + 1)) + TEXT_AREA;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = STRIP_WIDTH;
+            canvas.height = STRIP_HEIGHT;
+            const ctx = canvas.getContext('2d');
+
+            // 1. White Background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, STRIP_WIDTH, STRIP_HEIGHT);
+
+            // 2. Draw Photos
+            let currentY = PADDING;
+            imgObjects.forEach(img => {
+                ctx.drawImage(img, PADDING, currentY, PHOTO_WIDTH, PHOTO_HEIGHT);
+                currentY += PHOTO_HEIGHT + PADDING;
+            });
+
+            // 3. Draw Text
+            const now = new Date();
+            const dateStr = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
+            const text = `DIESEL TEST ${dateStr}`;
+
+            // Load Font (assuming it's loaded via CSS, canvas can use it)
+            ctx.fillStyle = '#222';
+            ctx.font = '60px "Covered By Your Grace"'; // Scaled for high-res canvas
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Text position centered in remaining space
+            const textCenterY = currentY + (TEXT_AREA / 2) - (PADDING / 2);
+            ctx.save();
+            ctx.translate(STRIP_WIDTH / 2, textCenterY);
+            ctx.rotate(-2 * Math.PI / 180); // -2 deg rotation
+            ctx.fillText(text, 0, 0);
+            ctx.restore();
+
+            return new Promise(resolve => {
+                canvas.toBlob(blob => {
+                    resolve(blob);
+                }, 'image/png');
+            });
+        }
+
+        async function shareMedia(blob, filename) {
+            const file = new File([blob], filename, { type: blob.type });
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Selfie Strip',
+                        text: 'Check out my Photobooth Strip!'
+                    });
+                } catch (err) {
+                    console.warn('Share failed or cancelled:', err);
+                    if (err.name !== 'AbortError') {
+                        downloadMedia(blob, filename);
+                    }
+                }
+            } else {
+                downloadMedia(blob, filename);
+            }
+        }
+
+        function downloadMedia(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            downloadAnchor.href = url;
+            downloadAnchor.download = filename;
+            downloadAnchor.click();
+            URL.revokeObjectURL(url);
+        }
+
+        const photoboothBtn = document.getElementById('photobooth_btn');
+
+        // AR Switch Logic
+        const arSwitchBtn = document.getElementById('ar_switch_btn');
+        const arModelViewer = document.getElementById('ar_model_viewer');
+
+        arSwitchBtn.addEventListener('click', () => {
+            arModelViewer.activateAR();
+        });
+
+        // Capture Button Click - Triggers Photobooth Sequence
+        captureBtn.addEventListener('click', async () => {
+            // If already done, ignore
+            if (postCaptureUi.classList.contains('visible')) return;
+
+            // Flash effect visual (optional, maybe blink the button)
+            captureBtn.style.transform = 'scale(0.8)';
+            setTimeout(() => captureBtn.style.transform = 'scale(1)', 100);
+
+            // Capture frame
+            const blob = await captureFrame();
+            capturedImages.push(blob);
+
+            // Update Counter
+            captureCounter.style.opacity = 1;
+            captureCounter.innerText = `${capturedImages.length} / ${MAX_PHOTOS}`;
+
+            if (capturedImages.length >= MAX_PHOTOS) {
+                // FINISHED SEQUENCE
+
+                // Fade to black
+                photoboothOverlay.classList.add('active');
+
+                // Generate Strip
+                currentPhotoBlob = await generateStrip(capturedImages);
+                const url = URL.createObjectURL(currentPhotoBlob);
+                polaroidImage.src = url;
+
+                // Update text visibility (Canvas has text, so hide overlay text or use it for fallback? 
+                // Plan said "Draw text". So canvas has text. Hide HTML text overlay.)
+                document.getElementById('polaroid_text').style.display = 'none';
+
+                // Start Animation
+                polaroidContainer.classList.remove('printing');
+                void polaroidContainer.offsetWidth; // trigger reflow
+                polaroidContainer.classList.add('printing');
+
+                // Show UI Buttons after animation
+                setTimeout(() => {
+                    postCaptureUi.classList.add('visible');
+                }, 4000); // 4s animation
+            }
+        });
+
+        pbTakeAgainBtn.addEventListener('click', () => {
+            postCaptureUi.classList.remove('visible');
+            photoboothOverlay.classList.remove('active');
+            polaroidContainer.classList.remove('printing');
+            captureCounter.style.opacity = 0;
+            captureCounter.innerText = "0 / 3";
+
+            if (polaroidImage.src) {
+                URL.revokeObjectURL(polaroidImage.src);
+                polaroidImage.src = '';
+            }
+            currentPhotoBlob = null;
+            capturedImages = []; // Reset
+        });
+
+        pbShareBtn.addEventListener('click', () => {
+            if (currentPhotoBlob) {
+                shareMedia(currentPhotoBlob, `photobooth_strip_${Date.now()}.png`);
+            }
+        });
+
+    </script>
+</body>
+
+</html>
