@@ -438,7 +438,7 @@
         }
 
         const loader = new GLTFLoader();
-        loader.load('./model.gltf', function (gltf) {
+        loader.load('./test1.glb', function (gltf) {
             neonModel = gltf.scene;
 
             neonModel.traverse((child) => {
@@ -498,7 +498,7 @@
         let backModel = null;
         let backMixer = null;
 
-        loader.load('./blender_test.glb', function (gltf) {
+        loader.load('./test1.glb', function (gltf) {
             backModel = gltf.scene;
 
             const box = new THREE.Box3().setFromObject(backModel);

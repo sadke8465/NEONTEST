@@ -374,7 +374,7 @@
         </div>
 
         <!-- Hidden Model Viewer to trigger AR -->
-        <model-viewer id="ar_model_viewer" src="blender_test.glb" ios-src="blender_test.glb.usdz" ar
+        <model-viewer id="ar_model_viewer" src="test1.glb" ios-src="test1.usdz" ar
             ar-modes="scene-viewer quick-look webxr" ar-scale="auto" ar-placement="floor" camera-controls
             touch-action="pan-y" disable-zoom auto-rotate shadow-intensity="1" exposure="1" environment-image="neutral"
             loading="eager" reveal="interaction" interaction-prompt="none"
@@ -465,7 +465,7 @@
             color: new THREE.Color(NEON_COLOR).multiplyScalar(NEON_INTENSITY_SCALAR)
         });
 
-        loader.load('./model.gltf', function (gltf) {
+        loader.load('./test1.glb', function (gltf) {
             loadedModel = gltf.scene;
 
             loadedModel.traverse((child) => {
