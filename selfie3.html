@@ -176,7 +176,8 @@
 
         #polaroid_container {
             position: absolute;
-            top: -600px;
+            top: -120vh;
+            /* Start further up to hide taller images */
             left: 50%;
             transform: translateX(-50%);
             width: 300px;
@@ -187,7 +188,7 @@
 
         #polaroid_image {
             width: 100%;
-            aspect-ratio: 9/16;
+            /* aspect-ratio removed to allow dynamic sizing */
             background: #000;
             display: block;
             filter: contrast(1.1) saturate(1.1);
@@ -209,46 +210,55 @@
 
         /* Animation Classes */
         .printing {
-            animation: printScroll 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            animation: printScroll 4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
 
         @keyframes printScroll {
             0% {
-                top: -600px;
+                top: -120vh;
             }
 
-            10% {
-                top: -600px;
+            5% {
+                top: -120vh;
+            }
+
+            /* Pulse 1 */
+            15% {
+                top: -100vh;
             }
 
             20% {
-                top: -450px;
+                top: -100vh;
             }
 
+            /* Pulse 2 */
             30% {
-                top: -450px;
+                top: -80vh;
             }
 
-            40% {
-                top: -300px;
+            35% {
+                top: -80vh;
+            }
+
+            /* Pulse 3 */
+            45% {
+                top: -60vh;
             }
 
             50% {
-                top: -300px;
+                top: -60vh;
             }
 
+            /* Pulse 4 */
             60% {
-                top: -150px;
+                top: -40vh;
             }
 
-            70% {
-                top: -150px;
+            65% {
+                top: -40vh;
             }
 
-            80% {
-                top: 50px;
-            }
-
+            /* Pulse 5 (Print Out) */
             100% {
                 top: 10%;
                 transform: translateX(-50%) rotate(-3deg);
