@@ -11,6 +11,16 @@
     <!-- Import model-viewer -->
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
     <style>
+        @font-face {
+            font-family: 'Franklin Gothic Ex Cn';
+            src: url('Franklin Gothic Std Extra Condensed.otf');
+        }
+
+        @font-face {
+            font-family: 'Assistant Custom';
+            src: url('Assistant-VariableFont_wght.ttf');
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -20,7 +30,27 @@
             width: 100vw;
             overflow: hidden;
             /* No scroll */
-            font-family: 'Assistant', sans-serif;
+            font-family: 'Assistant Custom', sans-serif;
+        }
+
+        /* Loading Screen */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease-out;
+        }
+
+        #loading-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
         }
 
         .container {
@@ -88,12 +118,26 @@
             width: 100%;
         }
 
-        .text-main {
+        .text-top {
             font-weight: 600;
-            font-size: 18px;
+            font-size: 14px;
             line-height: 1.5;
             direction: rtl;
             margin: 0;
+            font-family: 'Assistant Custom', sans-serif;
+        }
+
+        .text-bottom {
+            font-weight: 700;
+            font-size: 23px;
+            line-height: 1.5;
+            direction: rtl;
+            margin: 10px 0 0 0;
+            font-family: 'Assistant Custom', sans-serif;
+        }
+
+        .english-text {
+            font-family: 'Franklin Gothic Ex Cn', sans-serif;
         }
 
         .placeholder-container {
@@ -132,65 +176,98 @@
             justify-content: center;
             text-decoration: none;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
 
             /* Default State: Silver Metallic */
-            background: linear-gradient(180deg, #E0E0E0 0%, #B0B0B0 100%);
-            border-radius: 50px;
-            padding: 12px 30px;
-            /* Slightly smaller padding to fit */
+            background: linear-gradient(180deg, #DADADA 0%, #AFAFAF 100%);
+            border-radius: 12px;
+            padding: 10px 0;
+            /* Fixed height feel */
             width: 280px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            border: 1px solid #ccc;
+            height: 60px;
+            /* Explicit height */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+            border: none;
+            position: relative;
         }
 
         .activate-text {
-            color: #e40422;
-            font-size: 28px;
-            /* Slightly smaller font */
+            color: #d8001d;
+            /* Slightly deeper red */
+            font-size: 38px;
+            /* Larger text */
             font-weight: 700;
-            margin-right: 10px;
-            text-transform: uppercase;
-            transition: color 0.3s ease;
+            margin-right: 15px;
+            font-family: 'Franklin Gothic Ex Cn', sans-serif;
+            letter-spacing: -1px;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
         }
 
         .play-icon {
-            width: 24px;
-            height: 24px;
-            color: #e40422;
-            transition: color 0.3s ease;
+            width: 28px;
+            height: 28px;
+            color: #d8001d;
+            filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.4));
         }
 
         .play-icon-container {
             transform: rotate(90deg);
-            width: 24px;
-            height: 24px;
+            width: 28px;
+            height: 28px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        /* Hover/Active State: Red */
-        .activate-btn:hover,
+        /* Active/Clicked State: Red */
         .activate-btn:active {
-            background: #e40422;
-            transform: scale(1.02);
-            border-color: #e40422;
+            background: #d8001d;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
+            transform: scale(0.98);
         }
 
-        .activate-btn:hover .activate-text,
         .activate-btn:active .activate-text {
             color: white;
+            text-shadow: none;
         }
 
-        .activate-btn:hover .play-icon,
         .activate-btn:active .play-icon {
             color: white;
+            filter: none;
         }
     </style>
 </head>
 
 <body>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <svg width="195" height="75" viewBox="0 0 195 75" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="skeleton-grad" x1="0" y1="0" x2="300" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#333333" />
+                    <stop offset="50%" stop-color="#666666" />
+                    <stop offset="100%" stop-color="#333333" />
+                    <animate attributeName="x1" from="-300" to="300" dur="1.5s" repeatCount="indefinite" />
+                    <animate attributeName="x2" from="0" to="600" dur="1.5s" repeatCount="indefinite" />
+                </linearGradient>
+            </defs>
+            <path
+                d="M0 1.62455V72.2836H14.9691C34.7653 74.125 34.7568 49.0202 34.7568 49.0202V27.1787C34.5268 1.16798 15.8775 1.62455 15.8775 1.62455H0ZM13.9027 12.565C21.6327 12.0112 21.407 23.2291 21.407 23.2291V50.1656C21.6371 63.5173 13.1128 61.4616 13.1128 61.4616V12.644C13.379 12.6009 13.6534 12.5829 13.9027 12.565Z"
+                fill="url(#skeleton-grad)" />
+            <path d="M41.2012 1.61035H54.0915V72.2766H41.2012V1.61035Z" fill="url(#skeleton-grad)" />
+            <path
+                d="M90.6893 72.0795V61.6878H73.886V41.8916H85.6262V30.614H74.1173V12.8892H90.2305V1.61035H60.7656V72.221L90.6893 72.0795Z"
+                fill="url(#skeleton-grad)" />
+            <path
+                d="M114.628 21.8665H125.907C125.907 21.8665 127.288 0 109.563 0C91.8387 0 92.7613 17.0321 92.7613 17.0321C92.7613 17.0321 90.4598 30.8426 105.192 41.8902C105.192 41.8902 120.614 50.8688 114.859 60.535C114.859 60.535 105.652 68.8223 105.42 52.249H93.6814C93.6814 52.249 91.6099 75.0368 110.945 74.1167C110.945 74.1167 126.827 73.8854 127.979 57.3134C127.979 57.3134 129.821 45.1131 117.391 33.8342C117.391 33.8342 99.6672 22.3252 106.112 13.1178C106.112 13.1178 113.478 5.52316 114.628 21.8665Z"
+                fill="url(#skeleton-grad)" />
+            <path
+                d="M132.061 1.61035H161.549V13.1193H145.473V30.844H157.442V42.5829H145.243V61.6878H162.046V72.7367H132.353L132.061 1.61035Z"
+                fill="url(#skeleton-grad)" />
+            <path d="M168.206 1.61035H181.146V61.6878H194.731V72.7367H168.206V1.61035Z" fill="url(#skeleton-grad)" />
+        </svg>
+    </div>
 
     <div class="container">
         <!-- Background -->
@@ -204,12 +281,13 @@
         <div class="main-content">
             <!-- Text -->
             <div class="text-section">
-                <p class="text-main">
-                    צרו את ה-GIF שלכם<br>
-                    שתפו באינסטגרם<br>
-                    ותייגו<br>
-                    @diesel_il
-                </p>
+                <div class="text-top">
+                    צלמו את עצמכם בצורה הכי מקורית בלה בלה<br>
+                    תעלו לרשתות ותייגו את <span class="english-text">@DIESEL_ISRAEL</span>
+                </div>
+                <div class="text-bottom">
+                    ואולי תזכו בלה בלה
+                </div>
             </div>
 
             <!-- 3D Model Container -->
@@ -219,8 +297,8 @@
 
             <!-- Activate Buttons -->
             <div class="buttons-container">
-                <a href="selfie3.html?switch_mode=true" class="activate-btn">
-                    <span class="activate-text">Switch Mode</span>
+                <a href="selfie3.html?dualmode=false" class="activate-btn">
+                    <span class="activate-text">Activate</span>
                     <div class="play-icon-container">
                         <svg class="play-icon" width="19" height="22" viewBox="0 0 19 22" fill="none"
                             xmlns="http://www.w3.org/2000/svg">
@@ -230,24 +308,6 @@
                         </svg>
                     </div>
                 </a>
-
-                <model-viewer src="back_model.glb" ios-src="back_model.usdz" ar ar-modes="scene-viewer quick-look webxr"
-                    ar-scale="auto" ar-placement="floor" camera-controls touch-action="pan-y" disable-zoom auto-rotate
-                    shadow-intensity="1" exposure="1" environment-image="neutral" loading="eager" reveal="interaction"
-                    interaction-prompt="none" style="width: 280px; height: 60px; margin: 0; padding: 0;">
-                    <div slot="ar-button" class="activate-btn" style="margin: 0; height: 100%; width: 100%;">
-                        <span class="activate-text">Place in Space</span>
-                        <div class="play-icon-container">
-                            <svg class="play-icon" width="19" height="22" viewBox="0 0 19 22" fill="none"
-                                xmlns="http://www.w3.org/2000/svg">
-                                <path
-                                    d="M18 8.93201C19.3333 9.70181 19.3333 11.6263 18 12.3961L3 21.0564C1.66667 21.8262 8.49539e-07 20.8639 9.16837e-07 19.3243L1.67394e-06 2.00381C1.74124e-06 0.464207 1.66667 -0.498043 3 0.271757L18 8.93201Z"
-                                    fill="currentColor" />
-                            </svg>
-                        </div>
-                    </div>
-                    <div slot="poster" style="background: transparent;"></div>
-                </model-viewer>
             </div>
         </div>
     </div>
@@ -303,30 +363,51 @@
         backLight.position.set(-5, 5, -5);
         scene.add(backLight);
 
-        // Load Model
-        const loader = new GLTFLoader();
-        loader.load('back_model.glb', (gltf) => {
-            const model = gltf.scene;
+        // Create promises for different loading requirements
+        const minTimePromise = new Promise(resolve => setTimeout(resolve, 3000));
 
-            // Center the model
-            const box = new THREE.Box3().setFromObject(model);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-
-            // Reset position to center
-            model.position.x += (model.position.x - center.x);
-            model.position.y += (model.position.y - center.y);
-            model.position.z += (model.position.z - center.z);
-
-            // Scale model to fit
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const scale = 3 / maxDim; // Adjust '3' based on desired size relative to camera z=5
-            model.scale.set(scale, scale, scale);
-
-            scene.add(model);
-        }, undefined, (error) => {
-            console.error('An error happened loading the model:', error);
+        const windowLoadPromise = new Promise(resolve => {
+            if (document.readyState === 'complete') {
+                resolve();
+            } else {
+                window.addEventListener('load', resolve);
+            }
         });
+
+        const fontsLoadPromise = document.fonts.ready;
+
+        // Model loading promise
+        const modelLoadPromise = new Promise((resolve) => {
+            const loader = new GLTFLoader();
+            loader.load('back_model.glb', (gltf) => {
+                const model = gltf.scene;
+
+                // Center the model
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+
+                // Reset position to center
+                model.position.x += (model.position.x - center.x);
+                model.position.y += (model.position.y - center.y);
+                model.position.z += (model.position.z - center.z);
+
+                // Scale model to fit
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = 3 / maxDim; // Adjust '3' based on desired size relative to camera z=5
+                model.scale.set(scale, scale, scale);
+
+                scene.add(model);
+                adjustCameraDistance();
+                resolve(); // Resolve when model is added
+            }, undefined, (error) => {
+                console.error('An error happened loading the model:', error);
+                resolve(); // Resolve even on error to avoid sticking
+            });
+        });
+
+        // Initialize things that don't need waiting (scene setup)
+        // ... (existing scene setup code is outside this block usually, but we need to keep order)
 
         // Handle resize
         window.addEventListener('resize', () => {
@@ -337,7 +418,31 @@
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
             renderer.setSize(width, height);
+
+            adjustCameraDistance();
         });
+
+        function adjustCameraDistance() {
+            if (!container) return;
+
+            // We scaled the model to have a max dimension of 3.
+            // We want to ensure it fits within the FOV with some padding.
+            const modelSize = 3.5; // Size 3 + padding
+            const aspect = container.clientWidth / container.clientHeight;
+            const fovRad = camera.fov * (Math.PI / 180);
+
+            // Calculate distance needed for vertical and horizontal fit
+            const distVertical = modelSize / (2 * Math.tan(fovRad / 2));
+            const distHorizontal = modelSize / (2 * Math.tan(fovRad / 2) * aspect);
+
+            // Combine and ensure minimum distance (5 was the original default)
+            // We strictly take the max to ensure no cutting
+            const targetDistance = Math.max(distVertical, distHorizontal, 5);
+
+            // Update camera distance while preserving direction (orbit)
+            const direction = camera.position.clone().sub(controls.target).normalize();
+            camera.position.copy(controls.target).add(direction.multiplyScalar(targetDistance));
+        }
 
         // Animation loop
         function animate() {
@@ -346,6 +451,19 @@
             renderer.render(scene, camera);
         }
         animate();
+
+        // Check completion
+        Promise.all([minTimePromise, windowLoadPromise, fontsLoadPromise, modelLoadPromise]).then(() => {
+            console.log('All assets loaded and min time passed.');
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                loadingScreen.classList.add('hidden');
+                // Optional: remove from DOM after transition
+                setTimeout(() => {
+                    loadingScreen.remove();
+                }, 500);
+            }
+        });
     </script>
 
 </body>
