@@ -231,7 +231,7 @@
                     </div>
                 </a>
 
-                <model-viewer src="test1.glb" ios-src="test1.usdz" ar ar-modes="scene-viewer quick-look webxr"
+                <model-viewer src="back_model.glb" ios-src="back_model.usdz" ar ar-modes="scene-viewer quick-look webxr"
                     ar-scale="auto" ar-placement="floor" camera-controls touch-action="pan-y" disable-zoom auto-rotate
                     shadow-intensity="1" exposure="1" environment-image="neutral" loading="eager" reveal="interaction"
                     interaction-prompt="none" style="width: 280px; height: 60px; margin: 0; padding: 0;">
@@ -309,7 +309,7 @@
 
         // Load Model
         const loader = new GLTFLoader();
-        loader.load('test1.glb', (gltf) => {
+        loader.load('plain_d_test.gltf', (gltf) => {
             const model = gltf.scene;
             console.log('Model loaded:', model);
 
