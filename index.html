@@ -80,10 +80,10 @@
         .header {
             width: 100%;
             background-color: #e40422;
-            padding-top: max(50px, env(safe-area-inset-top) + 20px);
-            /* Safe area logic */
-            padding-bottom: 20px;
-            /* Slightly more space */
+            padding-top: 80px;
+            /* Fixed measurement */
+            padding-bottom: 0;
+            /* Reset to control exact gap */
             display: flex;
             justify-content: center;
             align-items: flex-end;
@@ -115,16 +115,17 @@
             margin: 0 auto;
             padding: 0 20px;
             box-sizing: border-box;
-            overflow: hidden;
-            /* Prevent scrolling */
+            overflow-y: auto;
+            /* Allow scroll if content + fixed margins exceed screen height */
+            -webkit-overflow-scrolling: touch;
         }
 
         .text-section {
             text-align: center;
             color: #e40422;
             width: 100%;
-            margin-top: 25px;
-            /* Spacing from header */
+            margin-top: 16px;
+            /* Fixed measurement */
             flex-shrink: 0;
             z-index: 5;
         }
@@ -146,8 +147,8 @@
             /* Slightly larger */
             line-height: 1.2;
             direction: rtl;
-            margin: 5px 0 0 0;
-            /* Tighten up */
+            margin: 10px 0 0 0;
+            /* Fixed measurement */
             font-family: 'Assistant Custom', sans-serif;
         }
 
@@ -164,7 +165,10 @@
             justify-content: center;
             align-items: center;
             position: relative;
-            /* Adjust negative margins to pull model up/down if needed */
+            margin-top: 20px;
+            /* Fixed measurement */
+            margin-bottom: 16px;
+            /* Fixed measurement */
         }
 
         /* Adjust model container to fill space but not overflow */
@@ -182,8 +186,8 @@
             width: 100%;
             align-items: center;
             flex-shrink: 0;
-            margin-bottom: max(30px, env(safe-area-inset-bottom) + 10px);
-            /* Safe area logic */
+            margin-bottom: 80px;
+            /* Fixed measurement */
             z-index: 10;
         }
 
@@ -367,11 +371,45 @@
         // Controls
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
+        controls.dampingFactor = 0.05; // Soft damping for premium feel
         controls.enableZoom = false;
         controls.enablePan = false;
         controls.autoRotate = true;
         controls.autoRotateSpeed = 2.0;
+
+        // Rotation Limits
+        // Vertical: -20deg (70deg polar) to +30deg (120deg polar) from horizontal (90deg)
+        // 90 - 20 = 70 degrees = ~1.2217 radians
+        // 90 + 30 = 120 degrees = ~2.0944 radians
+        controls.minPolarAngle = (90 - 20) * (Math.PI / 180);
+        controls.maxPolarAngle = (90 + 30) * (Math.PI / 180);
+
+        // Auto-rotate interaction logic
+        let isInteracting = false;
+        let autoRotateResumeTimeout = null;
+        let currentAutoRotateSpeed = 2.0;
+        const TARGET_AUTO_ROTATE_SPEED = 2.0;
+        const RESUME_DELAY = 500; // ms
+
+        controls.addEventListener('start', () => {
+            isInteracting = true;
+            controls.autoRotate = false; // Pause instantly
+            currentAutoRotateSpeed = 0; // Reset current speed for smooth ramp up later
+            if (autoRotateResumeTimeout) {
+                clearTimeout(autoRotateResumeTimeout);
+                autoRotateResumeTimeout = null;
+            }
+        });
+
+        controls.addEventListener('end', () => {
+            isInteracting = false;
+            // Delay resumption
+            autoRotateResumeTimeout = setTimeout(() => {
+                // We don't set autoRotate = true here immediately to avoid a jump.
+                // We let the animate loop handle the blending back to speed.
+                autoRotateResumeTimeout = null;
+            }, RESUME_DELAY);
+        });
 
         // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
@@ -469,6 +507,24 @@
         // Animation loop
         function animate() {
             requestAnimationFrame(animate);
+
+            // Custom Auto-Rotate Logic
+            if (!isInteracting && !autoRotateResumeTimeout) {
+                // Resume period reached, ramp up speed
+                if (currentAutoRotateSpeed < TARGET_AUTO_ROTATE_SPEED) {
+                    currentAutoRotateSpeed += (TARGET_AUTO_ROTATE_SPEED - currentAutoRotateSpeed) * 0.05;
+                }
+
+                // If we have enough speed, enable autoRotate
+                if (currentAutoRotateSpeed > 0.01) {
+                    controls.autoRotate = true;
+                    controls.autoRotateSpeed = currentAutoRotateSpeed;
+                }
+            } else {
+                // During interaction or waiting period
+                controls.autoRotate = false;
+            }
+
             controls.update();
             renderer.render(scene, camera);
         }
