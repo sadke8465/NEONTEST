@@ -274,20 +274,26 @@
             background: white;
             color: black;
             border: none;
-            padding: 12px 24px;
-            border-radius: 30px;
-            font-family: sans-serif;
-            font-weight: bold;
-            font-size: 14px;
+            width: 60px;
+            height: 60px;
+            padding: 0;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             cursor: pointer;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-            text-transform: uppercase;
+            transition: transform 0.2s;
+        }
+
+        .action_btn:active {
+            transform: scale(0.95);
         }
 
         .action_btn.secondary {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 1px solid white;
+            background: white;
+            color: black;
+            border: none;
         }
     </style>
 
@@ -321,8 +327,18 @@
                 <div id="polaroid_text"></div>
             </div>
             <div id="post_capture_ui">
-                <button id="pb_take_again" class="action_btn secondary">Take Again</button>
-                <button id="pb_share" class="action_btn">Share Capture</button>
+                <button id="pb_take_again" class="action_btn secondary" aria-label="Take Again">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path
+                            d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                    </svg>
+                </button>
+                <button id="pb_share" class="action_btn" aria-label="Share">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path
+                            d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z" />
+                    </svg>
+                </button>
             </div>
         </div>
 
