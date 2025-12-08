@@ -26,7 +26,7 @@
         }
 
         html {
-            background-color: #e40422;
+            background-color: transparent;
             /* Ensures top safe area is red if overscrolled/exposed */
         }
 
@@ -462,7 +462,7 @@
 
                 // Reset position to center AND shift down slightly for visual balance
                 model.position.x += (model.position.x - center.x);
-                model.position.y += (model.position.y - center.y); // Shift to center
+                model.position.y += (model.position.y - center.y) - 0.5; // Shift down by 0.5 units
                 model.position.z += (model.position.z - center.z);
 
                 // Scale model to fit
