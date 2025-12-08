@@ -356,6 +356,7 @@
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         const container = document.getElementById('model-container');
@@ -444,8 +445,14 @@
 
         // Model loading promise
         const modelLoadPromise = new Promise((resolve) => {
+            // Setup DRACO loader for compressed models
+            const dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+
             const loader = new GLTFLoader();
-            loader.load('blender_test.glb', (gltf) => {
+            loader.setDRACOLoader(dracoLoader);
+
+            loader.load('BLENDER_TEST_UV_COMPRESSED.glb', (gltf) => {
                 const model = gltf.scene;
 
                 // Center the model
@@ -455,7 +462,7 @@
 
                 // Reset position to center AND shift down slightly for visual balance
                 model.position.x += (model.position.x - center.x);
-                model.position.y += (model.position.y - center.y) - 0.5; // Shift down by 0.5 units
+                model.position.y += (model.position.y - center.y); // Shift to center
                 model.position.z += (model.position.z - center.z);
 
                 // Scale model to fit
