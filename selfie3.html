@@ -433,7 +433,7 @@
                 <!-- Hidden Model Viewer to trigger AR -->
                 <!-- iOS 18 Fix: Using Cloudflare R2 URL with correct MIME type (model/vnd.usdz+zip) -->
                 <model-viewer id="ar_model_viewer" src="blender_test.glb"
-                    ios-src="BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=1" ar
+                    ios-src="https://diesel-effect.info/BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=1" ar
                     ar-modes="quick-look scene-viewer webxr" ar-scale="auto" ar-placement="floor" camera-controls
                     touch-action="pan-y" disable-zoom auto-rotate shadow-intensity="1" exposure="1"
                     environment-image="neutral" loading="eager" reveal="interaction" interaction-prompt="none"
@@ -852,8 +852,8 @@
                         try {
                             await navigator.share({
                                 files: [file],
-                                title: 'Selfie Capture',
-                                text: 'Check out my Selfie!'
+                                title: 'Diesel Selfie',
+                                text: 'DIESEL\nDENIM - THE COLLECTION\nhttps://diesel.co.il/\nhttps://diesel-effect.com/'
                             });
                         } catch (err) {
                             console.warn('Share failed or cancelled:', err);
@@ -928,7 +928,12 @@
 
                 pbShareBtn.addEventListener('click', () => {
                     if (currentPhotoBlob) {
-                        shareMedia(currentPhotoBlob, `photobooth_${Date.now()}.png`);
+                        const now = new Date();
+                        const d = String(now.getDate()).padStart(2, '0');
+                        const m = String(now.getMonth() + 1).padStart(2, '0');
+                        const y = String(now.getFullYear()).slice(-2);
+                        const filename = `Diesel Selfie ${d}.${m}.${y}.png`;
+                        shareMedia(currentPhotoBlob, filename);
                     }
                 });
 
