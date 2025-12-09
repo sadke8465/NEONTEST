@@ -23,6 +23,20 @@
         // Let iOS settle before launch
         setTimeout(() => {
             link.click();
+
+            // Auto-close logic:
+            // After launch, if the window regains focus or visibility (meaning user closed AR), close this tab.
+            // We verify 'hasLaunched' to avoid closing before the user even enters.
+            setTimeout(() => {
+                const closeSelf = () => {
+                    window.close();
+                };
+
+                window.addEventListener("focus", closeSelf);
+                document.addEventListener("visibilitychange", () => {
+                    if (document.visibilityState === 'visible') closeSelf();
+                });
+            }, 1000); // 1s buffer for the AR view to take over
         }, 150);
     </script>
 
