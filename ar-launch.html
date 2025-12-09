@@ -4,12 +4,110 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1">
+    <title>Launching AR...</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <style>
+        @font-face {
+            font-family: 'Franklin Gothic Ex Cn';
+            src: url('Franklin Gothic Std Extra Condensed.otf');
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            /* Black page */
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: sans-serif;
+        }
+
+        /* ACTIVATE BUTTON STYLES from index.html */
+        .activate-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            /* Premium Silver Gradient */
+            background: linear-gradient(180deg, #FFFFFF 0%, #D0D0D0 40%, #A0A0A0 100%);
+            border-radius: 12px;
+            padding: 0 30px;
+            /* added padding for text width */
+            width: auto;
+            min-width: 250px;
+            height: 70px;
+
+            /* Deep soft shadow */
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+            border: none;
+            position: relative;
+        }
+
+        .activate-text {
+            color: #d8001d;
+            /* Diesel Red */
+            font-size: 28px;
+            /* Slightly smaller to fit "Back to..." */
+            font-weight: 700;
+            font-family: 'Franklin Gothic Ex Cn', sans-serif;
+            /* Fallback if font not loaded */
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
+            text-align: center;
+            padding-top: 4px;
+            /* Optical adjustment */
+        }
+
+        .activate-btn:active {
+            background: #d8001d;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+            transform: scale(0.98);
+        }
+
+        .activate-btn:active .activate-text {
+            color: white;
+        }
+
+        /* Hidden AR Link */
+        #ar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        #ar img {
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+        }
+
+        .instructions {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+    </style>
 </head>
 
 <body>
 
+    <!-- AR Trigger (Invisible) -->
     <a id="ar" rel="ar" href="#">
         <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=">
+    </a>
+
+    <!-- Manual Return Button -->
+    <a href="selfie3.html" class="activate-btn">
+        <span class="activate-text">Back to Selfie Mode</span>
     </a>
 
     <script>
@@ -23,20 +121,6 @@
         // Let iOS settle before launch
         setTimeout(() => {
             link.click();
-
-            // Auto-close logic:
-            // After launch, if the window regains focus or visibility (meaning user closed AR), close this tab.
-            // We verify 'hasLaunched' to avoid closing before the user even enters.
-            setTimeout(() => {
-                const closeSelf = () => {
-                    window.close();
-                };
-
-                window.addEventListener("focus", closeSelf);
-                document.addEventListener("visibilitychange", () => {
-                    if (document.visibilityState === 'visible') closeSelf();
-                });
-            }, 1000); // 1s buffer for the AR view to take over
         }, 150);
     </script>
 

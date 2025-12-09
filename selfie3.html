@@ -881,8 +881,8 @@
                 const arModelViewer = document.getElementById('ar_model_viewer');
 
                 arSwitchBtn.addEventListener('click', () => {
-                    // Open the dedicated AR launcher in a new tab to force a clean Session
-                    window.open('ar-launch.html?t=' + Date.now(), '_blank');
+                    // Open available AR in the same tab, which lets us define a "Back" button there
+                    window.location.href = 'ar-launch.html?t=' + Date.now();
                 });
 
                 // Capture Button Click - Triggers Photobooth Mode
