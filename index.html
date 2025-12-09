@@ -12,6 +12,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@600;700&display=swap" rel="stylesheet">
+    <script>
+        // Set app height immediately to prevent layout issues
+        const appHeight = () => {
+            const doc = document.documentElement;
+            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        }
+        window.addEventListener('resize', appHeight);
+        appHeight();
+    </script>
     <style>
         @font-face {
             font-family: 'Franklin Gothic Ex Cn';
@@ -71,7 +80,8 @@
         .container {
             position: relative;
             width: 100%;
-            height: 100%;
+            height: 100vh;
+            height: var(--app-height, 100vh);
             background-color: transparent;
             /* Changed from white to transparent */
             display: flex;
@@ -302,15 +312,6 @@
             <path d="M168.206 1.61035H181.146V61.6878H194.731V72.7367H168.206V1.61035Z" fill="url(#skeleton-grad)" />
         </svg>
     </div>
-
-    <script>
-        const appHeight = () => {
-            const doc = document.documentElement;
-            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-        }
-        window.addEventListener('resize', appHeight);
-        appHeight();
-    </script>
 
     <div class="container">
         <!-- Background -->
