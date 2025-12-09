@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Diesel AR Experience</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@600;700&display=swap" rel="stylesheet">
@@ -231,8 +233,9 @@
                     </div>
                 </a>
 
-                <model-viewer src="BLENDER_TEST_UV_COMPRESSED.glb" ios-src="BLENDER_AR_TEST_COMPRESSED.usdz" ar
-                    ar-modes="scene-viewer quick-look webxr" ar-scale="auto" ar-placement="floor" camera-controls
+                <model-viewer src="BLENDER_TEST_UV_COMPRESSED.glb"
+                    ios-src="BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=1" ar
+                    ar-modes="quick-look scene-viewer webxr" ar-scale="auto" ar-placement="floor" camera-controls
                     touch-action="pan-y" disable-zoom auto-rotate shadow-intensity="1" exposure="1"
                     environment-image="neutral" loading="eager" reveal="interaction" interaction-prompt="none"
                     style="width: 280px; height: 60px; margin: 0; padding: 0;">
@@ -252,6 +255,20 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // AR Error Handling for iOS reliability
+        const modelViewer = document.querySelector('model-viewer');
+        if (modelViewer) {
+            modelViewer.addEventListener('ar-status', (event) => {
+                if (event.detail.status === 'failed') {
+                    const errorMsg = 'AR Session failed to start. Please check if your device supports AR or try updating your AR services.';
+                    console.error(errorMsg, event.detail);
+                    alert(errorMsg);
+                }
+            });
+        }
+    </script>
 
     <!-- Three.js Implementation -->
     <script type="importmap">

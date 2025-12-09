@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Selfie Mode 3</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <!-- Import model-viewer -->
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
     <!-- Google Fonts -->
@@ -375,7 +377,7 @@
 
         <!-- Hidden Model Viewer to trigger AR -->
         <model-viewer id="ar_model_viewer" src="blender_test.glb"
-            ios-src="BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=1" ar ar-modes="scene-viewer quick-look webxr"
+            ios-src="BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=1" ar ar-modes="quick-look scene-viewer webxr"
             ar-scale="auto" ar-placement="floor" camera-controls touch-action="pan-y" disable-zoom auto-rotate
             shadow-intensity="1" exposure="1" environment-image="neutral" loading="eager" reveal="interaction"
             interaction-prompt="none"
