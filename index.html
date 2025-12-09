@@ -28,6 +28,10 @@
             /* Ensures top safe area is red if overscrolled/exposed */
         }
 
+        :root {
+            --app-height: 100%;
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -35,8 +39,8 @@
             /* Changed from #fff to show HTML bg or image */
             height: 100vh;
             /* Fallback */
-            height: 100dvh;
-            /* Mobile viewport height */
+            height: var(--app-height, 100dvh);
+            /* Mobile viewport height fix */
             width: 100vw;
             overflow: hidden;
             /* No scroll */
@@ -79,7 +83,8 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 100dvh;
+            height: 100vh;
+            height: var(--app-height, 100dvh);
             /* Use dynamic viewport height */
             object-fit: cover;
             z-index: 0;
@@ -298,6 +303,15 @@
         </svg>
     </div>
 
+    <script>
+        const appHeight = () => {
+            const doc = document.documentElement;
+            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        }
+        window.addEventListener('resize', appHeight);
+        appHeight();
+    </script>
+
     <div class="container">
         <!-- Background -->
         <img src="page_bg.png" alt="" class="bg-image">
@@ -315,7 +329,7 @@
                     תעלו לרשתותתתת ותייגו את <span class="english-text">@DIESEL_ISRAEL</span>
                 </div>
                 <div class="text-bottom">
-                    ואולייי תזכו !!!! בלה
+                    0101010ואולייי תזכו !!555!! בלה
                 </div>
             </div>
 
