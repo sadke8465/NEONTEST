@@ -142,6 +142,53 @@
             color: white;
         }
 
+        /* Restart Camera Button (Left Bottom) */
+        #restart_camera_container {
+            position: absolute;
+            bottom: 40px;
+            left: 20px;
+            z-index: 20;
+            width: 50px;
+            height: 50px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        #restart_camera_container.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        #restart_camera_btn {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 50, 50, 0.3);
+            border-radius: 50%;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 100, 100, 0.6);
+            cursor: pointer;
+            color: white;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                background: rgba(255, 50, 50, 0.3);
+            }
+
+            50% {
+                transform: scale(1.05);
+                background: rgba(255, 80, 80, 0.4);
+            }
+        }
+
         /* Icon Styles */
         .icon {
             width: 24px;
@@ -375,6 +422,17 @@
             </div>
         </div>
 
+        <!-- 3. Restart Camera Button (Left Bottom) -->
+        <div id="restart_camera_container">
+            <div id="restart_camera_btn">
+                <!-- Refresh Icon -->
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path
+                        d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                </svg>
+            </div>
+        </div>
+
         <!-- Hidden Model Viewer to trigger AR -->
         <model-viewer id="ar_model_viewer" src="blender_test.glb"
             ios-src="BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=1" ar ar-modes="quick-look scene-viewer webxr"
@@ -552,37 +610,112 @@
         }
         startCamera();
 
+        // Camera health monitoring
+        let cameraIssueDetected = false;
+        const restartCameraContainer = document.getElementById('restart_camera_container');
+        const restartCameraBtn = document.getElementById('restart_camera_btn');
+
+        function showRestartButton() {
+            if (!cameraIssueDetected) {
+                cameraIssueDetected = true;
+                restartCameraContainer.classList.add('visible');
+            }
+        }
+
+        function hideRestartButton() {
+            cameraIssueDetected = false;
+            restartCameraContainer.classList.remove('visible');
+        }
+
+        // Manual restart button click handler
+        restartCameraBtn.addEventListener('click', () => {
+            console.log('Manual camera restart triggered');
+            hideRestartButton();
+            startCamera();
+        });
+
+        // Monitor video play state
+        let lastFrameTime = videoElement.currentTime;
+        let frameFrozenCount = 0;
+
+        setInterval(() => {
+            if (videoElement.srcObject && !videoElement.paused) {
+                if (videoElement.currentTime === lastFrameTime) {
+                    frameFrozenCount++;
+                    if (frameFrozenCount > 3) { // 3 seconds frozen
+                        console.log('Camera appears frozen (no new frames)');
+                        showRestartButton();
+                    }
+                } else {
+                    frameFrozenCount = 0;
+                    lastFrameTime = videoElement.currentTime;
+                    if (cameraIssueDetected) {
+                        hideRestartButton();
+                    }
+                }
+            }
+        }, 1000);
+
         // Re-initialize camera when returning to the tab (e.g. from AR view)
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
-                // Determine if we need to restart
-                const stream = videoElement.srcObject;
-                const isPaused = videoElement.paused;
-                const isEnded = videoElement.ended;
+                // Small delay to let the page fully restore
+                setTimeout(() => {
+                    const stream = videoElement.srcObject;
+                    const isPaused = videoElement.paused;
+                    const isEnded = videoElement.ended;
 
-                let needsRestart = false;
+                    let needsRestart = false;
 
-                if (!stream || !stream.active) {
-                    needsRestart = true;
-                } else if (isPaused || isEnded) {
-                    // Try to resume first
-                    videoElement.play().catch(() => {
-                        console.log("Resume failed, restarting camera...");
-                        startCamera();
-                    });
-                } else {
-                    // Check individual tracks
-                    const tracks = stream.getVideoTracks();
-                    if (tracks.length > 0 && (tracks[0].readyState === 'ended' || tracks[0].muted)) {
+                    if (!stream || !stream.active) {
+                        console.log('No active stream detected after visibility change');
                         needsRestart = true;
+                    } else if (isPaused || isEnded) {
+                        // Try to resume first
+                        videoElement.play().catch(() => {
+                            console.log("Resume failed, restarting camera...");
+                            needsRestart = true;
+                        });
+                    } else {
+                        // Check individual tracks
+                        const tracks = stream.getVideoTracks();
+                        if (tracks.length === 0) {
+                            console.log('No video tracks found');
+                            needsRestart = true;
+                        } else if (tracks[0].readyState === 'ended' || tracks[0].muted) {
+                            console.log('Video track ended or muted');
+                            needsRestart = true;
+                        }
                     }
-                }
 
-                if (needsRestart) {
-                    console.log("Camera needs restart after visibility change.");
-                    startCamera();
-                }
+                    if (needsRestart) {
+                        console.log("Camera needs restart after visibility change.");
+                        showRestartButton();
+                        // Auto-restart after showing button
+                        setTimeout(() => {
+                            startCamera().then(() => {
+                                hideRestartButton();
+                            });
+                        }, 500);
+                    }
+                }, 300);
             }
+        });
+
+        // Also listen to page focus events (backup for iOS)
+        window.addEventListener('focus', () => {
+            setTimeout(() => {
+                const stream = videoElement.srcObject;
+                if (!stream || !stream.active) {
+                    console.log('Camera inactive on focus, attempting restart');
+                    showRestartButton();
+                    setTimeout(() => {
+                        startCamera().then(() => {
+                            hideRestartButton();
+                        });
+                    }, 500);
+                }
+            }, 300);
         });
 
         // =========================================================
