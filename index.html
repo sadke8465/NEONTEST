@@ -311,7 +311,7 @@
             <!-- Text -->
             <div class="text-section">
                 <div class="text-top">
-                    צלמו את עצמכם בצורה הכי מקורית בלההה בלה<br>
+                    צלמווו את עצמכם בצורה הכי מקורית בלההה בלה<br>
                     תעלו לרשתותתתת ותייגו את <span class="english-text">@DIESEL_ISRAEL</span>
                 </div>
                 <div class="text-bottom">
@@ -326,7 +326,7 @@
 
             <!-- Activate Buttons -->
             <div class="buttons-container">
-                <a href="selfie3.html?dualmode=false" class="activate-btn">
+                <a id="arBtn" class="activate-btn">
                     <span class="activate-text">Activate</span>
                     <div class="play-icon-container">
                         <svg class="play-icon" width="19" height="22" viewBox="0 0 19 22" fill="none"
@@ -698,6 +698,12 @@
         });
     </script>
 
+    <script>
+        document.getElementById("arBtn").addEventListener("click", () => {
+            // Force full WebKit + ARKit reset using a throwaway page
+            window.location.href = "ar-launch.html?t=" + Date.now();
+        });
+    </script>
 </body>
 
 </html>

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1">
+</head>
+
+<body>
+
+    <a id="ar" rel="ar" href="#">
+        <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=">
+    </a>
+
+    <script>
+        // ⚠️ This guarantees a BRAND NEW native AR session every time
+        const usdz = "https://pub-7428a43c955f475eb3776fc64ddb4242.r2.dev/BLENDER_AR_TEST_COMPRESSED.usdz";
+        const freshURL = usdz + "?v=" + Date.now();
+
+        const link = document.getElementById("ar");
+        link.href = freshURL;
+
+        // Let iOS settle before launch
+        setTimeout(() => {
+            link.click();
+        }, 150);
+    </script>
+
+</body>
+
+</html>
