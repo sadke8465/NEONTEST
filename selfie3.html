@@ -877,6 +877,9 @@
                 const arModelViewer = document.getElementById('ar_model_viewer');
 
                 arSwitchBtn.addEventListener('click', () => {
+                    const timestamp = Date.now();
+                    const usdzUrl = "https://pub-7428a43c955f475eb3776fc64ddb4242.r2.dev/BLENDER_AR_TEST_COMPRESSED.usdz";
+                    arModelViewer.setAttribute('ios-src', `${usdzUrl}?v=${timestamp}#allowsContentScaling=1`);
                     arModelViewer.activateAR();
                 });
 
