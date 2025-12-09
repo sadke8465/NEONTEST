@@ -354,78 +354,189 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
 
         const container = document.getElementById('model-container');
 
         // Scene setup
         const scene = new THREE.Scene();
-        // scene.background = new THREE.Color(0xffffff); // Optional: match bg or keep transparent
+
+        // --- 1. Enhanced Rendering Setup ---
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: true,
+            powerPreference: "high-performance"
+        });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2x for performance
+        renderer.shadowMap.enabled = true; // Enable Shadows
+        renderer.shadowMap.type = THREE.VSMShadowMap; // VSM for true soft shadows
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; // Better colors
+        renderer.toneMappingExposure = 1.0;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        container.appendChild(renderer.domElement);
+
+        // Enhance interactions with CSS
+        renderer.domElement.style.cursor = 'grab';
+        renderer.domElement.style.touchAction = 'none'; // Prevent scrolling while dragging
 
         // Camera setup
         const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
         camera.position.z = 5;
 
-        // Renderer setup
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(container.clientWidth, container.clientHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        container.appendChild(renderer.domElement);
-
-        // Controls
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05; // Soft damping for premium feel
-        controls.enableZoom = false;
-        controls.enablePan = false;
-        controls.autoRotate = true;
-        controls.autoRotateSpeed = 2.0;
-
-        // Rotation Limits
-        // Vertical: -20deg (70deg polar) to +30deg (120deg polar) from horizontal (90deg)
-        // 90 - 20 = 70 degrees = ~1.2217 radians
-        // 90 + 30 = 120 degrees = ~2.0944 radians
-        controls.minPolarAngle = (90 - 20) * (Math.PI / 180);
-        controls.maxPolarAngle = (90 + 30) * (Math.PI / 180);
-
-        // Auto-rotate interaction logic
-        let isInteracting = false;
-        let autoRotateResumeTimeout = null;
-        let currentAutoRotateSpeed = 2.0;
-        const TARGET_AUTO_ROTATE_SPEED = 2.0;
-        const RESUME_DELAY = 500; // ms
-
-        controls.addEventListener('start', () => {
-            isInteracting = true;
-            controls.autoRotate = false; // Pause instantly
-            currentAutoRotateSpeed = 0; // Reset current speed for smooth ramp up later
-            if (autoRotateResumeTimeout) {
-                clearTimeout(autoRotateResumeTimeout);
-                autoRotateResumeTimeout = null;
-            }
-        });
-
-        controls.addEventListener('end', () => {
-            isInteracting = false;
-            // Delay resumption
-            autoRotateResumeTimeout = setTimeout(() => {
-                // We don't set autoRotate = true here immediately to avoid a jump.
-                // We let the animate loop handle the blending back to speed.
-                autoRotateResumeTimeout = null;
-            }, RESUME_DELAY);
-        });
-
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+        // --- 2. Lighting Setup for Wall Shadows ---
+        // Ambient Light (General soft light)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
-        directionalLight.position.set(5, 5, 5);
-        scene.add(directionalLight);
+        // Hemisphere Light (Sky/Ground mix for natural feel)
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+        scene.add(hemiLight);
 
-        const backLight = new THREE.DirectionalLight(0xffffff, 1);
-        backLight.position.set(-5, 5, -5);
-        scene.add(backLight);
+        // Key Light (Main light that casts shadow)
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(2, 2, 5); // Front-right-up
+        dirLight.castShadow = true;
+        // Configure shadow properties
+        dirLight.shadow.mapSize.width = 512; // Lower res = softer
+        dirLight.shadow.mapSize.height = 512;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 10;
+        dirLight.shadow.blurSamples = 25; // VSM blur samples
+        dirLight.shadow.radius = 15; // Spread of the blur
+        dirLight.shadow.bias = -0.0001;
+        scene.add(dirLight);
+
+        // Fill Light (Soften shadows)
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        fillLight.position.set(-2, 0, 5);
+        scene.add(fillLight);
+
+        // --- 3. Shadow Receiving Wall ---
+        // An invisible plane strictly for catching shadows behind the model
+        const shadowPlaneGeometry = new THREE.PlaneGeometry(30, 30);
+        const shadowPlaneMaterial = new THREE.ShadowMaterial({
+            opacity: 0.2, // Subtle shadow intensity
+            color: 0x000000
+        });
+        const shadowPlane = new THREE.Mesh(shadowPlaneGeometry, shadowPlaneMaterial);
+        shadowPlane.position.z = -1.5; // Position behind the model
+        shadowPlane.receiveShadow = true;
+        scene.add(shadowPlane);
+
+        // Controls - REPLACED with custom logic
+        // We no longer use OrbitControls because we want the camera/lights/shadow-wall to be static
+        // and only the object to rotate.
+
+        // Model container state
+        const state = {
+            isDragging: false,
+            previousMousePosition: { x: 0, y: 0 },
+            targetRotation: { x: 0, y: 0 }, // We'll accumulate rotation here
+            momentum: { x: 0, y: 0 },       // For inertial spinning
+            autoRotateSpeed: 1.2,           // Base auto-rotate speed
+            currentAutoRotateSpeed: 1.2,    // Dynamic speed (ramps up/down)
+            isInteracting: false,
+            resumeTimeout: null
+        };
+
+        // Constants
+        const DAMPING = 0.95; // Inertia decay (0-1)
+        const MOUSE_SENSITIVITY = 0.005;
+        const TOUCH_SENSITIVITY = 0.005;
+        const AUTO_ROTATE_TARGET = 1.2;
+        const RESUME_DELAY = 1000;
+
+        // Limits (in radians)
+        const MAX_TILT_X = 30 * (Math.PI / 180); // Down
+        const MIN_TILT_X = -20 * (Math.PI / 180); // Up
+
+        // Event Listeners for Custom Interaction
+        const canvas = renderer.domElement;
+
+        function onStart(x, y) {
+            state.isDragging = true;
+            state.isInteracting = true;
+            state.previousMousePosition = { x, y };
+            state.currentAutoRotateSpeed = 0; // Stop auto-rotate immediately
+            state.momentum = { x: 0, y: 0 };  // Reset momentum
+            canvas.style.cursor = 'grabbing';
+
+            if (navigator.vibrate) navigator.vibrate(10); // Haptic
+
+            if (state.resumeTimeout) {
+                clearTimeout(state.resumeTimeout);
+                state.resumeTimeout = null;
+            }
+        }
+
+        function onMove(x, y) {
+            if (!state.isDragging || !modelReference) return;
+
+            const deltaMove = {
+                x: x - state.previousMousePosition.x,
+                y: y - state.previousMousePosition.y
+            };
+
+            // Calculate rotation change
+            // Drag X -> Rotate Y (Spin)
+            // Drag Y -> Rotate X (Tilt)
+            const rotateX = deltaMove.y * MOUSE_SENSITIVITY;
+            const rotateY = deltaMove.x * MOUSE_SENSITIVITY;
+
+            // Apply to target (we'll apply target to model in animate)
+            // We apply directly to model here for responsiveness, but track momentum
+            modelReference.rotation.y += rotateY;
+            modelReference.rotation.x += rotateX;
+
+            // Clamp X rotation (Tilt)
+            modelReference.rotation.x = Math.max(MIN_TILT_X, Math.min(MAX_TILT_X, modelReference.rotation.x));
+
+            // Store momentum for release
+            state.momentum.x = rotateX;
+            state.momentum.y = rotateY;
+
+            state.previousMousePosition = { x, y };
+        }
+
+        function onEnd() {
+            state.isDragging = false;
+            state.isInteracting = false;
+            canvas.style.cursor = 'grab';
+
+            // Set timeout to resume auto-rotation
+            state.resumeTimeout = setTimeout(() => {
+                state.resumeTimeout = null;
+                // animate loop checks this null to start ramping up speed
+            }, RESUME_DELAY);
+        }
+
+        // Mouse Events
+        canvas.addEventListener('mousedown', (e) => onStart(e.offsetX, e.offsetY));
+        canvas.addEventListener('mousemove', (e) => onMove(e.offsetX, e.offsetY));
+        canvas.addEventListener('mouseup', onEnd);
+        canvas.addEventListener('mouseleave', onEnd);
+
+        // Touch Events
+        canvas.addEventListener('touchstart', (e) => {
+            // e.preventDefault(); // Handled by touch-action: none CSS
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                onStart(touch.clientX - rect.left, touch.clientY - rect.top);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            // e.preventDefault();
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                onMove(touch.clientX - rect.left, touch.clientY - rect.top);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', onEnd);
 
         // Create promises for different loading requirements
         const minTimePromise = new Promise(resolve => setTimeout(resolve, 3000));
@@ -440,6 +551,9 @@
 
         const fontsLoadPromise = document.fonts.ready;
 
+        let modelReference = null; // To access model in animate loop
+        let basePosition = { x: 0, y: 0, z: 0 }; // Store home position
+
         // Model loading promise
         const modelLoadPromise = new Promise((resolve) => {
             // Setup DRACO loader for compressed models
@@ -451,33 +565,42 @@
 
             loader.load('BLENDER_TEST_UV_COMPRESSED.glb', (gltf) => {
                 const model = gltf.scene;
+                modelReference = model; // Store reference
 
                 // Center the model
                 const box = new THREE.Box3().setFromObject(model);
                 const center = box.getCenter(new THREE.Vector3());
                 const size = box.getSize(new THREE.Vector3());
 
-                // Reset position to center with y-offset of 0
+                // Reset position to center
                 model.position.x += (model.position.x - center.x);
-                model.position.y += (model.position.y - center.y); // No vertical offset
+                model.position.y += (model.position.y - center.y);
                 model.position.z += (model.position.z - center.z);
+
+                // Save this "centered" position as base
+                basePosition = model.position.clone();
+
+                // Enable Cast Shadow
+                model.traverse((node) => {
+                    if (node.isMesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true; // Self shadowing
+                    }
+                });
 
                 // Scale model to fit with 1.2x multiplier
                 const maxDim = Math.max(size.x, size.y, size.z);
-                const scale = (3 / maxDim) * 1.2; // Base scale * 1.2
+                const scale = (3 / maxDim) * 1.2;
                 model.scale.set(scale, scale, scale);
 
                 scene.add(model);
                 adjustCameraDistance();
-                resolve(); // Resolve when model is added
+                resolve();
             }, undefined, (error) => {
                 console.error('An error happened loading the model:', error);
-                resolve(); // Resolve even on error to avoid sticking
+                resolve();
             });
         });
-
-        // Initialize things that don't need waiting (scene setup)
-        // ... (existing scene setup code is outside this block usually, but we need to keep order)
 
         // Handle resize
         window.addEventListener('resize', () => {
@@ -493,49 +616,70 @@
         });
 
         function adjustCameraDistance() {
+            // Camera distance logic remains similar, but since we are static,
+            // we just ensure the model fits nicely.
             if (!container) return;
 
-            // Follow-up tweak: Increased padding to avoid clipping
-            // Previous modelSize was 3.5. Increasing to 4.5 to provide more ample space.
-            const modelSize = 4.5;
+            const modelSize = 4.5; // Padding factor
             const aspect = container.clientWidth / container.clientHeight;
             const fovRad = camera.fov * (Math.PI / 180);
 
-            // Calculate distance needed for vertical and horizontal fit
             const distVertical = modelSize / (2 * Math.tan(fovRad / 2));
             const distHorizontal = modelSize / (2 * Math.tan(fovRad / 2) * aspect);
 
-            // Combine and ensure minimum distance (previously 5)
-            // Increased min distance to 6 to be safe
             const targetDistance = Math.max(distVertical, distHorizontal, 6);
 
-            // Update camera distance while preserving direction (orbit)
-            const direction = camera.position.clone().sub(controls.target).normalize();
-            camera.position.copy(controls.target).add(direction.multiplyScalar(targetDistance));
+            // Set simple clean Z distance since we don't have orbit controls target anymore
+            camera.position.set(0, 0, targetDistance);
+            camera.lookAt(0, 0, 0);
         }
 
-        // Animation loop
+        // --- 5. Animation Loop with Subtle Effects ---
+        const clock = new THREE.Clock();
+
         function animate() {
             requestAnimationFrame(animate);
 
-            // Custom Auto-Rotate Logic
-            if (!isInteracting && !autoRotateResumeTimeout) {
-                // Resume period reached, ramp up speed
-                if (currentAutoRotateSpeed < TARGET_AUTO_ROTATE_SPEED) {
-                    currentAutoRotateSpeed += (TARGET_AUTO_ROTATE_SPEED - currentAutoRotateSpeed) * 0.05;
+            const time = clock.getElapsedTime();
+
+            if (modelReference) {
+                // 1. Interactive Rotation & Inertia
+                if (!state.isDragging) {
+                    // Apply Momentum (Inertia)
+                    if (Math.abs(state.momentum.x) > 0.0001 || Math.abs(state.momentum.y) > 0.0001) {
+                        modelReference.rotation.x += state.momentum.x;
+                        modelReference.rotation.y += state.momentum.y;
+
+                        // Clamp X
+                        modelReference.rotation.x = Math.max(MIN_TILT_X, Math.min(MAX_TILT_X, modelReference.rotation.x));
+
+                        // Decay
+                        state.momentum.x *= DAMPING;
+                        state.momentum.y *= DAMPING;
+                    }
+
+                    // 2. Auto-Rotate Restore
+                    if (!state.isInteracting && !state.resumeTimeout) {
+                        // Ramp up speed
+                        if (state.currentAutoRotateSpeed < state.autoRotateSpeed) {
+                            state.currentAutoRotateSpeed += (state.autoRotateSpeed - state.currentAutoRotateSpeed) * 0.05;
+                        }
+
+                        // Apply auto-rotation (Spin Y)
+                        if (state.currentAutoRotateSpeed > 0.01) {
+                            // Convert speed to radians per frame (approx)
+                            // OrbitControls autoRotateSpeed 2.0 ~= 30 sec per orbit
+                            // Let's approximate: 0.01 radians per frame
+                            modelReference.rotation.y += (state.currentAutoRotateSpeed * 0.005);
+                        }
+                    }
                 }
 
-                // If we have enough speed, enable autoRotate
-                if (currentAutoRotateSpeed > 0.01) {
-                    controls.autoRotate = true;
-                    controls.autoRotateSpeed = currentAutoRotateSpeed;
-                }
-            } else {
-                // During interaction or waiting period
-                controls.autoRotate = false;
+                // 3. Floating Animation (Sine wave on Y)
+                // Add to base position so we don't drift
+                modelReference.position.y = basePosition.y + Math.sin(time * 1.5) * 0.1;
             }
 
-            controls.update();
             renderer.render(scene, camera);
         }
         animate();
