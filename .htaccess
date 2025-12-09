@@ -1,0 +1,30 @@
+# AR Quick Look USDZ MIME Type Configuration
+# This file configures Apache servers to serve USDZ files with the correct MIME type
+# Required for iOS AR Quick Look to work properly
+
+# Add USDZ MIME type
+AddType model/vnd.usdz+zip .usdz
+
+# Alternative MIME type (some systems prefer this)
+# AddType model/vnd.pixar.usdz .usdz
+
+# Enable CORS for AR assets (allows cross-origin AR viewing)
+<IfModule mod_headers.c>
+    <FilesMatch "\.(usdz|reality)$">
+        Header set Access-Control-Allow-Origin "*"
+        Header set Access-Control-Allow-Methods "GET, OPTIONS"
+        Header set Access-Control-Allow-Headers "Content-Type"
+    </FilesMatch>
+</IfModule>
+
+# Optional: Cache control for 3D models (1 year)
+<IfModule mod_expires.c>
+    <FilesMatch "\.(usdz|glb|gltf)$">
+        ExpiresActive On
+        ExpiresDefault "access plus 1 year"
+    </FilesMatch>
+</IfModule>
+
+# Note: This file is NOT used by GitHub Pages
+# GitHub Pages does not support .htaccess
+# For GitHub Pages deployments, use Cloudflare R2 or similar CDN for proper MIME types
