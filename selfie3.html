@@ -657,6 +657,10 @@
                 // Re-initialize camera when returning to the tab (e.g. from AR view)
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState === 'visible') {
+                        // iOS AR Fix: Clean up viewer on return to ensure fresh session next time
+                        const arViewer = document.getElementById('ar_model_viewer');
+                        if (arViewer) arViewer.remove();
+
                         // Small delay to let the page fully restore
                         setTimeout(() => {
                             const stream = videoElement.srcObject;
@@ -877,10 +881,51 @@
                 const arModelViewer = document.getElementById('ar_model_viewer');
 
                 arSwitchBtn.addEventListener('click', () => {
-                    const timestamp = Date.now();
+                    // 1. Force Destroy Previous Session
+                    const oldViewer = document.getElementById('ar_model_viewer');
+                    if (oldViewer) {
+                        oldViewer.remove();
+                    }
+
+                    // 2. Create Fresh Viewer
+                    const viewer = document.createElement('model-viewer');
+                    viewer.id = 'ar_model_viewer';
+
+                    const ts = Date.now();
                     const usdzUrl = "https://pub-7428a43c955f475eb3776fc64ddb4242.r2.dev/BLENDER_AR_TEST_COMPRESSED.usdz";
-                    arModelViewer.setAttribute('ios-src', `${usdzUrl}?v=${timestamp}#allowsContentScaling=1`);
-                    arModelViewer.activateAR();
+
+                    // Essential for iOS Quick Look
+                    viewer.setAttribute('ios-src', `${usdzUrl}?v=${ts}#allowsContentScaling=1`);
+                    viewer.setAttribute('src', 'blender_test.glb'); // Fallback
+                    viewer.setAttribute('ar', '');
+                    viewer.setAttribute('ar-modes', 'quick-look scene-viewer webxr');
+                    viewer.setAttribute('ar-scale', 'auto');
+                    viewer.setAttribute('ar-placement', 'floor');
+
+                    // Stylings to keep it invisible but functional
+                    viewer.style.position = 'absolute';
+                    viewer.style.top = '0';
+                    viewer.style.left = '0';
+                    viewer.style.width = '1px';
+                    viewer.style.height = '1px';
+                    viewer.style.opacity = '0';
+                    viewer.style.pointerEvents = 'none';
+
+                    // Re-attach Error Handling
+                    viewer.addEventListener('ar-status', (event) => {
+                        if (event.detail.status === 'failed') {
+                            const errorMsg = 'AR Session failed to start. Please check if your device supports AR services or try updating Google Play Services for AR.';
+                            console.error(errorMsg);
+                            alert(errorMsg);
+                        }
+                    });
+
+                    document.body.appendChild(viewer);
+
+                    // 3. Force Launch
+                    setTimeout(() => {
+                        viewer.activateAR();
+                    }, 50);
                 });
 
                 // Capture Button Click - Triggers Photobooth Mode
