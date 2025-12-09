@@ -458,14 +458,14 @@
                 const center = box.getCenter(new THREE.Vector3());
                 const size = box.getSize(new THREE.Vector3());
 
-                // Reset position to center AND shift down slightly for visual balance
+                // Reset position to center with y-offset of 0
                 model.position.x += (model.position.x - center.x);
-                model.position.y += (model.position.y - center.y) - 0.5; // Shift down by 0.5 units
+                model.position.y += (model.position.y - center.y); // No vertical offset
                 model.position.z += (model.position.z - center.z);
 
-                // Scale model to fit
+                // Scale model to fit with 1.2x multiplier
                 const maxDim = Math.max(size.x, size.y, size.z);
-                const scale = 3 / maxDim; // Keep base scale logic
+                const scale = (3 / maxDim) * 1.2; // Base scale * 1.2
                 model.scale.set(scale, scale, scale);
 
                 scene.add(model);
