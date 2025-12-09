@@ -433,8 +433,8 @@
                 <!-- Hidden Model Viewer to trigger AR -->
                 <!-- iOS 18 Fix: Using Cloudflare R2 URL with correct MIME type (model/vnd.usdz+zip) -->
                 <model-viewer id="ar_model_viewer" src="blender_test.glb"
-                    ios-src="https://pub-7428a43c955f475eb3776fc64ddb4242.r2.dev/BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=1"
-                    ar ar-modes="quick-look scene-viewer webxr" ar-scale="auto" ar-placement="floor" camera-controls
+                    ios-src="BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=1" ar
+                    ar-modes="quick-look scene-viewer webxr" ar-scale="auto" ar-placement="floor" camera-controls
                     touch-action="pan-y" disable-zoom auto-rotate shadow-intensity="1" exposure="1"
                     environment-image="neutral" loading="eager" reveal="interaction" interaction-prompt="none"
                     style="position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none;">
