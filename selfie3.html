@@ -374,12 +374,25 @@
         </div>
 
         <!-- Hidden Model Viewer to trigger AR -->
-        <model-viewer id="ar_model_viewer" src="blender_test.glb" ios-src="BLENDER_AR_TEST_COMPRESSED.usdz" ar
-            ar-modes="scene-viewer quick-look webxr" ar-scale="auto" ar-placement="floor" camera-controls
-            touch-action="pan-y" disable-zoom auto-rotate shadow-intensity="1" exposure="1" environment-image="neutral"
-            loading="eager" reveal="interaction" interaction-prompt="none"
+        <model-viewer id="ar_model_viewer" src="blender_test.glb"
+            ios-src="BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=1" ar ar-modes="scene-viewer quick-look webxr"
+            ar-scale="auto" ar-placement="floor" camera-controls touch-action="pan-y" disable-zoom auto-rotate
+            shadow-intensity="1" exposure="1" environment-image="neutral" loading="eager" reveal="interaction"
+            interaction-prompt="none"
             style="position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none;">
         </model-viewer>
+
+        <script>
+            // AR Error Handling
+            const modelViewer = document.getElementById('ar_model_viewer');
+            modelViewer.addEventListener('ar-status', (event) => {
+                if (event.detail.status === 'failed') {
+                    const errorMsg = 'AR Session failed to start. Please check if your device supports AR services or try updating Google Play Services for AR.';
+                    console.error(errorMsg);
+                    alert(errorMsg);
+                }
+            });
+        </script>
 
         <a id="download_anchor" style="display:none"></a>
     </div>
