@@ -106,7 +106,8 @@
     </a>
 
     <!-- Manual Return Button -->
-    <a href="selfie3.html" class="activate-btn">
+    <a href="selfie3.html" id="backBtn" class="activate-btn"
+        style="opacity: 0; pointer-events: none; transition: opacity 0.5s ease;">
         <span class="activate-text">Back to Selfie Mode</span>
     </a>
 
@@ -121,6 +122,13 @@
         // Let iOS settle before launch
         setTimeout(() => {
             link.click();
+
+            // Show the Back button after 10 seconds (behind the AR view)
+            setTimeout(() => {
+                const backBtn = document.getElementById("backBtn");
+                backBtn.style.opacity = "1";
+                backBtn.style.pointerEvents = "auto";
+            }, 10000);
         }, 150);
     </script>
 
