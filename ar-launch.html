@@ -4,14 +4,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>Launch AR</title>
+    <title>Launching AR...</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-    <!-- Model Viewer -->
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
-
     <style>
         @font-face {
             font-family: 'Franklin Gothic Ex Cn';
@@ -22,21 +17,19 @@
             margin: 0;
             padding: 0;
             background-color: #000000;
+            /* Black page */
             height: 100vh;
             width: 100vw;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            gap: 20px;
             font-family: sans-serif;
-            overflow: hidden;
         }
 
-        /* VISIBLE AR LAUNCH BUTTON - MUST BE TAPPABLE (ANDROID ONLY) */
+        /* ACTIVATE BUTTON STYLES from index.html */
         .activate-btn {
-            display: none;
-            /* Hidden by default, shown via JS for Android */
+            display: flex;
             align-items: center;
             justify-content: center;
             text-decoration: none;
@@ -47,6 +40,7 @@
             background: linear-gradient(180deg, #FFFFFF 0%, #D0D0D0 40%, #A0A0A0 100%);
             border-radius: 12px;
             padding: 0 30px;
+            /* added padding for text width */
             width: auto;
             min-width: 250px;
             height: 70px;
@@ -59,13 +53,17 @@
 
         .activate-text {
             color: #d8001d;
+            /* Diesel Red */
             font-size: 28px;
+            /* Slightly smaller to fit "Back to..." */
             font-weight: 700;
             font-family: 'Franklin Gothic Ex Cn', sans-serif;
+            /* Fallback if font not loaded */
             letter-spacing: -0.5px;
             text-transform: uppercase;
             text-align: center;
             padding-top: 4px;
+            /* Optical adjustment */
         }
 
         .activate-btn:active {
@@ -78,137 +76,106 @@
             color: white;
         }
 
-        /* Instructions */
-        .instructions {
-            color: #999;
-            font-size: 16px;
-            text-align: center;
-            max-width: 80%;
+        /* Hidden AR Link */
+        #ar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
             margin-bottom: 20px;
         }
 
-        /* PREVIEW MODEL (iOS ONLY) */
-        model-viewer {
-            display: none;
-            /* Hidden by default, shown via JS for iOS */
-            width: 80vw;
-            height: 60vh;
-            background-color: transparent;
-            --poster-color: transparent;
+        #ar img {
+            width: 1px;
+            height: 1px;
+            opacity: 0;
         }
 
-        /* Manual Return Button */
-        #backBtn {
-            position: absolute;
-            bottom: 40px;
-            z-index: 10;
+        .instructions {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
         }
     </style>
 </head>
 
 <body>
 
-    <!-- INSTRUCTIONS AND PREVIEW -->
-    <div id="instruction-text" class="instructions">
-        <!-- Text injected by JS -->
-    </div>
-
-    <!-- IOS: LIVE MODEL PREVIEW -->
-    <!-- Note: ar-modes="webxr scene-viewer quick-look" is default, but we'll set it just in case -->
-    <!-- ios-src points to hosted USDZ -->
-    <!-- src points to local GLB (for the preview itself) -->
-    <model-viewer id="ar-preview" src="BLENDER_TEST_UV_COMPRESSED.glb"
-        ios-src="https://diesel-effect.info/BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=0&quicklook-show-play-button=0"
-        ar ar-modes="quick-look webxr scene-viewer" camera-controls auto-rotate shadow-intensity="1"
-        camera-orbit="0deg 90deg 105%" min-camera-orbit="auto auto 5%" max-camera-orbit="auto auto 100%"
-        interaction-prompt="none">
-    </model-viewer>
-
-    <!-- ANDROID: LAUNCH BUTTON -->
-    <a id="ar-launch-android" href="#" class="activate-btn">
-        <span class="activate-text">Launch in AR</span>
+    <!-- AR Trigger (Invisible) -->
+    <a id="ar" rel="ar" href="#">
+        <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=">
     </a>
 
-    <!-- BACK BUTTON - HIDDEN UNTIL AR IS LAUNCHED -->
+    <!-- Manual Return Button -->
     <a href="selfie3.html" id="backBtn" class="activate-btn"
         style="opacity: 0; pointer-events: none; transition: opacity 0.5s ease;">
         <span class="activate-text">Back to Selfie Mode</span>
     </a>
 
     <script>
+        // Platform detection
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         const isAndroid = /Android/.test(navigator.userAgent);
 
-        const previewEl = document.getElementById("ar-preview");
-        const androidBtn = document.getElementById("ar-launch-android");
-        const instructionText = document.getElementById("instruction-text");
-        const backBtn = document.getElementById("backBtn");
+        const link = document.getElementById("ar");
 
         if (isIOS) {
-            // ✅ iOS MODE: Show 3D Model
-            previewEl.style.display = "block";
-            instructionText.innerText = "Tap the model to view in your space";
+            // iOS: Use Quick Look with USDZ
+            // Using HOSTED URL as per instructions for reliability, but with user's logic structure
+            const usdz = "https://diesel-effect.info/BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=0&quicklook-show-play-button=0";
+            // Note: Adding cache buster to a hosted URL might need '&' if it has params, or '?' if not.
+            // The hosted URL has fragments (#). Parameters should go before fragment.
+            // But usdz variable has fragments.
+            // Proper construction:
+            const baseUrl = "https://diesel-effect.info/BLENDER_AR_TEST_COMPRESSED.usdz";
+            const fragment = "#allowsContentScaling=0&quicklook-show-play-button=0";
+            const freshURL = baseUrl + "?v=" + Date.now() + fragment;
 
-            // Note: model-viewer handles the click-to-launch-ar automatically when 'ar' attribute is present
-            // We just need to handle the back button reveal
+            link.href = freshURL;
 
-            // Listen for AR launch attempt (when user clicks the AR button inside model-viewer or the model itself if configured)
-            // Ideally we want tapping the model to launch it.
-            // By default, model-viewer adds an AR button. We can style it or let the whole component be the trigger.
-            // Customizing slot="ar-button" to be the whole area is complex, but standard behavior is:
-            // "Display a button or let users tap" -> We'll rely on the standard "AR Button" or user tapping the AR button that appears.
-            // ACTUALLY: Let's make sure the user knows to tap the button model-viewer provides, OR
-            // we can trigger activateAR() programmatically if we want the WHOLE model to be the button.
+            // Let iOS settle before launch
+            setTimeout(() => {
+                link.click();
 
-            previewEl.addEventListener('click', () => {
-                previewEl.activateAR();
-            });
-
-            // Reveal back button after interaction
-            previewEl.addEventListener('click', () => {
+                // Show the Back button after AR launch (behind the AR view)
                 setTimeout(() => {
+                    const backBtn = document.getElementById("backBtn");
                     backBtn.style.opacity = "1";
                     backBtn.style.pointerEvents = "auto";
-                }, 4000);
-            });
-
-            // Hard reset on visibility change (background return)
-            document.addEventListener("visibilitychange", () => {
-                if (document.visibilityState === "visible") {
-                    location.reload();
-                }
-            });
+                }, 5550);
+            }, 150);
 
         } else if (isAndroid) {
-            // ✅ ANDROID MODE: Show Button
-            androidBtn.style.display = "flex";
-            instructionText.innerText = "Tap below to launch AR";
-
-            // Android Logic
+            // Android: Use Google Scene Viewer with GLB
             const glbFile = "BLENDER_TEST_UV_COMPRESSED.glb";
             const baseURL = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
             const modelURL = encodeURIComponent(baseURL + glbFile);
             const title = encodeURIComponent("Diesel AR");
 
+            // Build Scene Viewer Intent URL
             const sceneViewerURL = `intent://arvr.google.com/scene-viewer/1.0?file=${modelURL}&mode=ar_only&title=${title}#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;end;`;
 
-            androidBtn.href = sceneViewerURL;
+            link.href = sceneViewerURL;
 
-            androidBtn.addEventListener("click", () => {
+            // Launch immediately on Android
+            setTimeout(() => {
+                window.location.href = sceneViewerURL;
+
+                // Show the Back button
                 setTimeout(() => {
+                    const backBtn = document.getElementById("backBtn");
                     backBtn.style.opacity = "1";
                     backBtn.style.pointerEvents = "auto";
                 }, 2000);
-            });
+            }, 150);
 
         } else {
-            // DESKTOP
+            // Desktop or other platforms - show message
             document.body.innerHTML = `
-                <div style="color: white; text-align: center; padding: 20px; font-family: sans-serif;">
+                <div style="color: white; text-align: center; padding: 20px;">
                     <h2>AR Not Available</h2>
-                    <p>Please open this page on an iOS or Android device.</p>
-                    <a href="selfie3.html" class="activate-btn" style="display:inline-flex; margin-top: 20px;">
-                        <span class="activate-text">Back</span>
+                    <p>Please open this page on an iOS or Android device to experience AR.</p>
+                    <a href="selfie3.html" class="activate-btn" style="margin-top: 20px;">
+                        <span class="activate-text">Back to Selfie Mode</span>
                     </a>
                 </div>
             `;

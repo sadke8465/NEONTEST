@@ -114,6 +114,8 @@
             position: relative;
             z-index: 1;
             flex-grow: 1;
+            flex-shrink: 1;
+            /* Allow shrinking */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -125,8 +127,8 @@
             padding: 0 30px;
             /* Increased side padding */
             box-sizing: border-box;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
+            overflow: hidden;
+            /* No scroll */
         }
 
         .text-section {
@@ -168,7 +170,10 @@
         .placeholder-container {
             width: 100%;
             flex-grow: 1;
-            /* Take remaining space */
+            flex-shrink: 1;
+            /* Take remaining space but shrink if needed */
+            min-height: 0;
+            /* Crucial for flex child shrinking */
             display: flex;
             justify-content: center;
             align-items: center;
@@ -181,7 +186,6 @@
         #model-container {
             width: 100%;
             height: 100%;
-            min-height: 300px;
         }
 
 
@@ -326,38 +330,38 @@
 
             <!-- 3D Model Container -->
             <div class="placeholder-container" id="model-wrapper">
-                <div id="model-container" style="width: 100%; height: 100%; min-height: 300px;"></div>
+                <div id="model-container" style="width: 100%; height: 100%; min-height: 0;"></div>
             </div>
+        </div>
 
-            <!-- Activate Buttons -->
-            <div class="buttons-container">
-                <!-- AR MODE BUTTON -->
-                <a id="btn-ar-mode" href="#" class="activate-btn">
-                    <span class="activate-text">AR MODE</span>
-                    <div class="play-icon-container">
-                        <svg class="play-icon" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                            xmlns="http://www.w3.org/2000/svg">
-                            <path
-                                d="M3 5c0-1.1.9-2 2-2h3.5a1 1 0 1 0 0-2H5a4 4 0 0 0-4 4v3.5a1 1 0 1 0 2 0V5zm12-4a1 1 0 0 1 1 1v3.5a1 1 0 1 0 2 0V5a4 4 0 0 0-4-4h-3.5a1 1 0 1 0 0 2H15zm4 12a1 1 0 0 1 1 1V19a4 4 0 0 1-4 4h-3.5a1 1 0 1 1 0-2H19v-3.5a1 1 0 0 1 1-1zM5 21a2 2 0 0 1-2-2v-3.5a1 1 0 1 1 2 0V19h3.5a1 1 0 1 1 0 2H5z"
-                                fill="currentColor" />
-                        </svg>
-                    </div>
-                </a>
+        <!-- Activate Buttons -->
+        <div class="buttons-container">
+            <!-- AR MODE BUTTON -->
+            <a id="btn-ar-mode" href="ar-launch.html" class="activate-btn">
+                <span class="activate-text">AR MODE</span>
+                <div class="play-icon-container">
+                    <svg class="play-icon" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path
+                            d="M3 5c0-1.1.9-2 2-2h3.5a1 1 0 1 0 0-2H5a4 4 0 0 0-4 4v3.5a1 1 0 1 0 2 0V5zm12-4a1 1 0 0 1 1 1v3.5a1 1 0 1 0 2 0V5a4 4 0 0 0-4-4h-3.5a1 1 0 1 0 0 2H15zm4 12a1 1 0 0 1 1 1V19a4 4 0 0 1-4 4h-3.5a1 1 0 1 1 0-2H19v-3.5a1 1 0 0 1 1-1zM5 21a2 2 0 0 1-2-2v-3.5a1 1 0 1 1 2 0V19h3.5a1 1 0 1 1 0 2H5z"
+                            fill="currentColor" />
+                    </svg>
+                </div>
+            </a>
 
-                <!-- SELFIE MODE BUTTON -->
-                <a id="btn-selfie-mode" href="selfie3.html" class="activate-btn">
-                    <span class="activate-text">SELFIE MODE</span>
-                    <div class="play-icon-container">
-                        <svg class="play-icon" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                            xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" fill="currentColor" />
-                            <path fill-rule="evenodd" clip-rule="evenodd"
-                                d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"
-                                fill="currentColor" />
-                        </svg>
-                    </div>
-                </a>
-            </div>
+            <!-- SELFIE MODE BUTTON -->
+            <a id="btn-selfie-mode" href="selfie3.html" class="activate-btn">
+                <span class="activate-text">SELFIE MODE</span>
+                <div class="play-icon-container">
+                    <svg class="play-icon" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" fill="currentColor" />
+                        <path fill-rule="evenodd" clip-rule="evenodd"
+                            d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"
+                            fill="currentColor" />
+                    </svg>
+                </div>
+            </a>
         </div>
     </div>
 
@@ -719,55 +723,7 @@
     </script>
 
 
-    <!-- AR Logic -->
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            const isAndroid = /Android/.test(navigator.userAgent);
 
-            const arBtn = document.getElementById("btn-ar-mode");
-
-            if (isIOS) {
-                // iOS: Use native Quick Look via rel="ar"
-                // Hosted file URL as requested
-                const usdzUrl = "https://diesel-effect.info/BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=0&quicklook-show-play-button=0";
-
-                arBtn.setAttribute("rel", "ar");
-                arBtn.href = usdzUrl;
-
-                // Add an img inside if needed by some iOS versions to trigger (though anchor tag usually works)
-                // However, standard implementation is anchor > img. We have anchor > div > svg. 
-                // Let's ensure the anchor itself is the trigger.
-
-            } else if (isAndroid) {
-                // Android: Use Scene Viewer Intent
-                const glbFile = "BLENDER_TEST_UV_COMPRESSED.glb";
-                // Construct absolute URL for the GLB
-                const baseURL = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
-                const modelURL = baseURL + glbFile;
-
-                const title = "Diesel AR";
-
-                // Intent parameters
-                // mode=ar_only: Launches directly into AR view
-                // resizable=false: Keeps scale fixed if desired, or true
-                const scheme = "https";
-                const pkg = "com.google.ar.core";
-                const action = "android.intent.action.VIEW";
-
-                const intentUrl = `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(modelURL)}&mode=ar_only&title=${encodeURIComponent(title)}#Intent;scheme=${scheme};package=${pkg};action=${action};end;`;
-
-                arBtn.href = intentUrl;
-
-            } else {
-                // Desktop / Fallback
-                arBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    alert("Please open this page on an iOS or Android device to experience AR.");
-                });
-            }
-        });
-    </script>
 </body>
 
 </html>
