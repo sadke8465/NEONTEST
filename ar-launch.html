@@ -4,7 +4,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1">
-    <title>Launching AR...</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Launch AR</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <style>
@@ -17,17 +18,18 @@
             margin: 0;
             padding: 0;
             background-color: #000000;
-            /* Black page */
             height: 100vh;
             width: 100vw;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            gap: 20px;
             font-family: sans-serif;
+            overflow: hidden;
         }
 
-        /* ACTIVATE BUTTON STYLES from index.html */
+        /* VISIBLE AR LAUNCH BUTTON - MUST BE TAPPABLE */
         .activate-btn {
             display: flex;
             align-items: center;
@@ -40,7 +42,6 @@
             background: linear-gradient(180deg, #FFFFFF 0%, #D0D0D0 40%, #A0A0A0 100%);
             border-radius: 12px;
             padding: 0 30px;
-            /* added padding for text width */
             width: auto;
             min-width: 250px;
             height: 70px;
@@ -53,17 +54,13 @@
 
         .activate-text {
             color: #d8001d;
-            /* Diesel Red */
             font-size: 28px;
-            /* Slightly smaller to fit "Back to..." */
             font-weight: 700;
             font-family: 'Franklin Gothic Ex Cn', sans-serif;
-            /* Fallback if font not loaded */
             letter-spacing: -0.5px;
             text-transform: uppercase;
             text-align: center;
             padding-top: 4px;
-            /* Optical adjustment */
         }
 
         .activate-btn:active {
@@ -76,65 +73,70 @@
             color: white;
         }
 
-        /* Hidden AR Link */
-        #ar {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        #ar img {
-            width: 1px;
-            height: 1px;
-            opacity: 0;
-        }
-
+        /* Instructions */
         .instructions {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
+            color: #999;
+            font-size: 16px;
+            text-align: center;
+            max-width: 80%;
         }
     </style>
 </head>
 
 <body>
 
-    <!-- AR Trigger (Invisible) -->
-    <a id="ar" rel="ar" href="#">
-        <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=">
+    <!-- VISIBLE AR LAUNCH BUTTON - NO AUTO CLICK -->
+    <div class="instructions">
+        Tap below to launch AR
+    </div>
+
+    <a id="ar-launch" rel="ar" href="#" class="activate-btn">
+        <span class="activate-text">Launch in AR</span>
     </a>
 
-    <!-- Manual Return Button -->
+    <!-- BACK BUTTON - HIDDEN UNTIL AR IS LAUNCHED -->
     <a href="selfie3.html" id="backBtn" class="activate-btn"
         style="opacity: 0; pointer-events: none; transition: opacity 0.5s ease;">
         <span class="activate-text">Back to Selfie Mode</span>
     </a>
 
     <script>
-        // Platform detection
+        // ✅ 1. NO AUTO-LAUNCH - User must tap
+        // ✅ 2. Visible button with rel="ar"
+        // ✅ 3. Quick Look AR mode flags
+        // ✅ 4. URL assigned after page load
+        // ✅ 5. Back button revealed after tap
+        // ✅ 6. Hard reset on visibility change
+
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         const isAndroid = /Android/.test(navigator.userAgent);
 
-        const link = document.getElementById("ar");
+        const arBtn = document.getElementById("ar-launch");
+        const backBtn = document.getElementById("backBtn");
 
         if (isIOS) {
-            // iOS: Use Quick Look with USDZ
+            // ✅ iOS: Assign AR URL with Quick Look flags AFTER page load
             const usdz = "BLENDER_AR_TEST_COMPRESSED.usdz";
-            const freshURL = usdz + "?v=" + Date.now();
-            link.href = freshURL;
+            const arURL = usdz
+                + "?v=" + Date.now()
+                + "#allowsContentScaling=0&quicklook-show-play-button=0";
 
-            // Let iOS settle before launch
-            setTimeout(() => {
-                link.click();
+            arBtn.href = arURL;
 
-                // Show the Back button after AR launch (behind the AR view)
+            // ✅ Reveal back button ONLY after user taps AR
+            arBtn.addEventListener("click", () => {
                 setTimeout(() => {
-                    const backBtn = document.getElementById("backBtn");
                     backBtn.style.opacity = "1";
                     backBtn.style.pointerEvents = "auto";
-                }, 5550);
-            }, 150);
+                }, 4000);
+            });
+
+            // ✅ Hard reset Quick Look when returning from background
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "visible") {
+                    location.reload();
+                }
+            });
 
         } else if (isAndroid) {
             // Android: Use Google Scene Viewer with GLB
@@ -146,19 +148,15 @@
             // Build Scene Viewer Intent URL
             const sceneViewerURL = `intent://arvr.google.com/scene-viewer/1.0?file=${modelURL}&mode=ar_only&title=${title}#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;end;`;
 
-            link.href = sceneViewerURL;
+            arBtn.href = sceneViewerURL;
 
-            // Launch immediately on Android
-            setTimeout(() => {
-                window.location.href = sceneViewerURL;
-
-                // Show the Back button
+            // Reveal back button after tap
+            arBtn.addEventListener("click", () => {
                 setTimeout(() => {
-                    const backBtn = document.getElementById("backBtn");
                     backBtn.style.opacity = "1";
                     backBtn.style.pointerEvents = "auto";
                 }, 2000);
-            }, 150);
+            });
 
         } else {
             // Desktop or other platforms - show message
