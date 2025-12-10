@@ -112,24 +112,66 @@
     </a>
 
     <script>
-        // ⚠️ This guarantees a BRAND NEW native AR session every time
-        const usdz = "https://diesel-effect.info/BLENDER_AR_TEST_COMPRESSED.usdz";
-        const freshURL = usdz + "?v=" + Date.now();
+        // Platform detection
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isAndroid = /Android/.test(navigator.userAgent);
 
         const link = document.getElementById("ar");
-        link.href = freshURL;
 
-        // Let iOS settle before launch
-        setTimeout(() => {
-            link.click();
+        if (isIOS) {
+            // iOS: Use Quick Look with USDZ
+            const usdz = "BLENDER_AR_TEST_COMPRESSED.usdz";
+            const freshURL = usdz + "?v=" + Date.now();
+            link.href = freshURL;
 
-            // Show the Back button after 10 seconds (behind the AR view)
+            // Let iOS settle before launch
             setTimeout(() => {
-                const backBtn = document.getElementById("backBtn");
-                backBtn.style.opacity = "1";
-                backBtn.style.pointerEvents = "auto";
-            }, 5550);
-        }, 150);
+                link.click();
+
+                // Show the Back button after AR launch (behind the AR view)
+                setTimeout(() => {
+                    const backBtn = document.getElementById("backBtn");
+                    backBtn.style.opacity = "1";
+                    backBtn.style.pointerEvents = "auto";
+                }, 5550);
+            }, 150);
+
+        } else if (isAndroid) {
+            // Android: Use Google Scene Viewer with GLB
+            const glbFile = "BLENDER_TEST_UV_COMPRESSED.glb";
+            const baseURL = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+            const modelURL = encodeURIComponent(baseURL + glbFile);
+            const title = encodeURIComponent("Diesel AR");
+
+            // Build Scene Viewer Intent URL
+            const sceneViewerURL = `intent://arvr.google.com/scene-viewer/1.0?file=${modelURL}&mode=ar_only&title=${title}#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;end;`;
+
+            link.href = sceneViewerURL;
+
+            // Launch immediately on Android
+            setTimeout(() => {
+                window.location.href = sceneViewerURL;
+
+                // Show the Back button
+                setTimeout(() => {
+                    const backBtn = document.getElementById("backBtn");
+                    backBtn.style.opacity = "1";
+                    backBtn.style.pointerEvents = "auto";
+                }, 2000);
+            }, 150);
+
+        } else {
+            // Desktop or other platforms - show message
+            document.body.innerHTML = `
+                <div style="color: white; text-align: center; padding: 20px;">
+                    <h2>AR Not Available</h2>
+                    <p>Please open this page on an iOS or Android device to experience AR.</p>
+                    <a href="selfie3.html" class="activate-btn" style="margin-top: 20px;">
+                        <span class="activate-text">Back to Selfie Mode</span>
+                    </a>
+                </div>
+            `;
+        }
     </script>
 
 </body>
