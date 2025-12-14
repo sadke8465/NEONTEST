@@ -41,6 +41,9 @@
             width: 100%;
             height: 100%;
             z-index: 1;
+            opacity: 0;
+            /* Start invisible for fade-in animation */
+            transition: opacity 0.8s ease;
         }
 
         .input_video {
@@ -78,6 +81,9 @@
             text-decoration: none;
             color: white;
             border: 1px solid rgba(255, 255, 255, 0.5);
+            opacity: 0;
+            /* Start invisible for fade-in animation */
+            transition: opacity 0.6s ease;
         }
 
         /* Capture Button (Middle Bottom) */
@@ -90,6 +96,9 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            opacity: 0;
+            /* Start invisible for fade-in animation */
+            transition: opacity 0.6s ease;
         }
 
         #capture_btn {
@@ -126,6 +135,9 @@
             z-index: 20;
             width: 50px;
             height: 50px;
+            opacity: 0;
+            /* Start invisible for fade-in animation */
+            transition: opacity 0.6s ease;
         }
 
         #ar_switch_btn {
@@ -189,12 +201,17 @@
             }
         }
 
-        /* Switch Model Button (Top Right) */
+        /* Switch Model Button (Center Bottom, above capture button) */
         #switch_model_container {
             position: absolute;
-            top: 80px;
-            right: 20px;
+            bottom: 140px;
+            /* Above the capture button */
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 20;
+            opacity: 0;
+            /* Start invisible for fade-in animation */
+            transition: opacity 0.6s ease;
         }
 
         #switch_model_btn {
@@ -207,9 +224,10 @@
             border: 1px solid rgba(255, 255, 255, 0.5);
             cursor: pointer;
             color: white;
-            padding: 10px 15px;
-            font-family: monospace;
-            font-size: 12px;
+            padding: 10px 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            /* Better Hebrew font support */
+            font-size: 14px;
             font-weight: bold;
             transition: all 0.3s ease;
         }
@@ -384,6 +402,75 @@
             color: black;
             border: none;
         }
+
+        /* Tooltip Styles */
+        #tooltip_container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            z-index: 30;
+            max-width: 340px;
+            width: 85%;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            padding: 16px 20px 20px 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #tooltip_container.visible {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+            pointer-events: all;
+        }
+
+        #tooltip_text {
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 15px;
+            font-weight: bold;
+            line-height: 1.5;
+            text-align: center;
+            margin: 0;
+            padding: 28px 30px 0 10px;
+            direction: rtl;
+        }
+
+        #tooltip_close {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            line-height: 1;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #tooltip_close:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        #tooltip_close:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.35);
+        }
     </style>
 
     <script type="importmap">
@@ -408,9 +495,9 @@
             </svg>
         </a>
 
-        <!-- Switch Model Button (Top Right) -->
+        <!-- Switch Model Button (Center Bottom, above capture) -->
         <div id="switch_model_container">
-            <div id="switch_model_btn">SWITCH MODEL</div>
+            <div id="switch_model_btn">החלף אפקט</div>
         </div>
 
         <!-- Photobooth Overlay -->
@@ -469,6 +556,12 @@
         </div>
 
         <a id="download_anchor" style="display:none"></a>
+
+        <!-- Tooltip -->
+        <div id="tooltip_container">
+            <button id="tooltip_close" aria-label="Close">×</button>
+            <p id="tooltip_text">תזיזו, תסובבו ותגדילו את המודל כדי לקבל את התמונה המושלמת!</p>
+        </div>
     </div>
     <video class="input_video" playsinline muted></video>
 
@@ -497,7 +590,7 @@
         const NEON_INTENSITY_SCALAR = 10.0;
 
         // Model switching state
-        let currentModel = 'neon'; // 'neon' or 'object'
+        let currentModel = 'object'; // 'neon' or 'object'
         let objectModel = null;
         let objectModelBaseScale = 1.0; // Store the initial base scale
         let objectModelTransform = {
@@ -518,6 +611,33 @@
             initialRotation: 0,
             initialAngle: 0
         };
+
+        // Animation state for model switching
+        let modelSwitchAnimation = {
+            isAnimating: false,
+            startTime: 0,
+            duration: 400, // ms
+            fromModel: null,
+            toModel: null,
+            fromOpacity: 1.0,
+            toOpacity: 0.0
+        };
+
+        // Initial appearance animation for D model on page load
+        let initialAppearAnimation = {
+            isAnimating: false,
+            startTime: 0,
+            duration: 1000, // ms - longer for smooth entrance
+            hasPlayed: false
+        };
+
+        // Track loading state
+        let modelsLoaded = {
+            neon: false,
+            object: false
+        };
+
+
 
         // =========================================================
         //  === SETUP ===
@@ -592,8 +712,13 @@
             pointLight.position.set(0, 0, 2);
             loadedModel.add(pointLight);
 
+            loadedModel.visible = false; // Hidden by default, start with object model
             scene.add(loadedModel);
             fitModelToCamera();
+
+            // Mark neon model as loaded
+            modelsLoaded.neon = true;
+            checkAllLoaded();
 
         }, undefined, function (error) {
             console.error('Error loading neon model:', error);
@@ -626,22 +751,117 @@
 
             // Position in center of screen
             objectModel.position.set(0, 0, 0);
-            objectModel.visible = false; // Hidden by default
+            objectModel.visible = true; // Visible by default (D mode starts first)
+
+            // Enhance materials - add subtle emissive glow and set up for animation
+            objectModel.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    // Minimal emissive color for subtle enhancement
+                    if (child.material.emissive) {
+                        child.material.emissive.setHex(0x6699cc); // Gentle blue emissive
+                        child.material.emissiveIntensity = 0.0; // Very subtle glow
+                    }
+
+                    // Set up for initial appearance animation
+                    child.material.transparent = true;
+                    child.material.opacity = 0; // Start invisible
+
+                    // Ensure the material updates
+                    child.material.needsUpdate = true;
+                }
+            });
 
             scene.add(objectModel);
             console.log('Object model loaded successfully');
+
+            // Mark object model as loaded
+            modelsLoaded.object = true;
+            checkAllLoaded();
 
         }, undefined, function (error) {
             console.error('Error loading object model:', error);
         });
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+        // Function to check if all models are loaded and start fade-in sequence
+        function checkAllLoaded() {
+            if (modelsLoaded.neon && modelsLoaded.object) {
+                console.log('All models loaded, starting fade-in sequence');
+
+                // Start camera and UI fade-in after a short delay
+                setTimeout(() => {
+                    // Fade in camera/canvas
+                    const canvas = document.getElementById('three_canvas');
+                    if (canvas) canvas.style.opacity = '1';
+
+                    // Fade in all controls
+                    const backBtn = document.getElementById('back_btn');
+                    const captureContainer = document.getElementById('capture_container');
+                    const arSwitchContainer = document.getElementById('ar_switch_container');
+                    const switchModelContainer = document.getElementById('switch_model_container');
+
+                    if (backBtn) backBtn.style.opacity = '1';
+                    if (captureContainer) captureContainer.style.opacity = '1';
+                    if (arSwitchContainer) arSwitchContainer.style.opacity = '1';
+                    if (switchModelContainer) switchModelContainer.style.opacity = '1';
+
+                    // After camera fades in (800ms), start D model fade-in
+                    setTimeout(() => {
+                        initialAppearAnimation.isAnimating = true;
+                        initialAppearAnimation.startTime = performance.now();
+
+                        // Show tooltip after model finishes appearing (1000ms animation + 500ms delay)
+                        setTimeout(() => {
+                            const tooltip = document.getElementById('tooltip_container');
+                            if (tooltip) {
+                                tooltip.classList.add('visible');
+                            }
+                        }, 1500); // Wait for model to finish animating
+                    }, 1200); // 800ms camera fade + 400ms pause
+                }, 300); // Small initial delay
+            }
+        }
+
+
+        const ambientLight = new THREE.AmbientLight(0xadd8e6, 2.0); // BRIGHT blue-tinted ambient light
         scene.add(ambientLight);
 
-        // Add directional light for object model
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(2, 3, 5);
-        scene.add(dirLight);
+        // Enhanced lighting setup for D model (object model)
+        const objectLights = []; // Array to store lights for animation
+
+        // Key Light - Main directional light from front-top (bright blue-white)
+        const keyLight = new THREE.DirectionalLight(0xccddff, 5.0);
+        keyLight.position.set(3, 4, 5);
+        scene.add(keyLight);
+        objectLights.push(keyLight);
+
+        // Fill Light - Strong blue light from opposite side
+        const fillLight = new THREE.DirectionalLight(0x6699ff, 3.5);
+        fillLight.position.set(-3, 2, 3);
+        scene.add(fillLight);
+        objectLights.push(fillLight);
+
+        // Rim Light - Blue-tinted back light for edge definition
+        const rimLight = new THREE.DirectionalLight(0x88bbff, 3.0);
+        rimLight.position.set(0, 3, -5);
+        scene.add(rimLight);
+        objectLights.push(rimLight);
+
+        // Accent Point Lights - Add depth and visual interest
+        const accentLight1 = new THREE.PointLight(0xff3366, 6.0, 15);
+        accentLight1.position.set(-2, 1, 2);
+        scene.add(accentLight1);
+        objectLights.push(accentLight1);
+
+        const accentLight2 = new THREE.PointLight(0x3366ff, 8.0, 20); // SUPER bright blue accent
+        accentLight2.position.set(2, -1, 2);
+        scene.add(accentLight2);
+        objectLights.push(accentLight2);
+
+        // Start with lights at zero intensity (since we start with object model but will animate in)
+        objectLights.forEach(light => {
+            light.intensity = light.intensity; // Keep initial values for reference
+            light.userData.baseIntensity = light.intensity; // Store base intensity
+        });
 
         // =========================================================
         //  === POST-PROCESSING ===
@@ -901,8 +1121,192 @@
 
             bloomPass.strength = 2.0 + pulse + flicker;
 
-            if (pointLight) {
+            // Only animate point light when neon sign is active and not during transition
+            if (pointLight && currentModel === 'neon' && !modelSwitchAnimation.isAnimating) {
                 pointLight.intensity = 100.0 + (pulse * 20) + (flicker * 30);
+            }
+
+            // Animate object lights when object model is active and not during transition
+            if (currentModel === 'object' && !modelSwitchAnimation.isAnimating && !initialAppearAnimation.isAnimating && objectLights.length > 0) {
+                // Subtle pulsing for accent lights
+                const slowPulse = Math.sin(time * 1.5) * 0.15;
+                const fastPulse = Math.sin(time * 3) * 0.08;
+
+                // Animate accent point lights with subtle pulsing
+                if (objectLights[3]) { // accentLight1 (pink)
+                    objectLights[3].intensity = objectLights[3].userData.baseIntensity * (1 + slowPulse);
+                }
+                if (objectLights[4]) { // accentLight2 (blue)
+                    objectLights[4].intensity = objectLights[4].userData.baseIntensity * (1 + fastPulse);
+                }
+            }
+
+            // Handle initial appearance animation for D model on first load
+            if (initialAppearAnimation.isAnimating && initialAppearAnimation.startTime > 0) {
+                const elapsed = performance.now() - initialAppearAnimation.startTime;
+                const progress = Math.min(elapsed / initialAppearAnimation.duration, 1.0);
+
+                // Ease-out cubic for smooth deceleration
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+                // Fade in opacity
+                const fadeInOpacity = easeProgress;
+
+                // Scale animation - start at 0.8, end at 1.0
+                const scaleProgress = 0.8 + (0.2 * easeProgress);
+
+                if (objectModel) {
+                    // Apply opacity to all materials
+                    objectModel.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material.opacity = fadeInOpacity;
+                        }
+                    });
+
+                    // Apply scale animation
+                    const baseScale = objectModelBaseScale * objectModelTransform.scale;
+                    objectModel.scale.set(baseScale * scaleProgress, baseScale * scaleProgress, baseScale * scaleProgress);
+                }
+
+                // Fade in object lights
+                objectLights.forEach(light => {
+                    light.intensity = light.userData.baseIntensity * fadeInOpacity;
+                });
+
+                // Animation complete
+                if (progress >= 1.0) {
+                    initialAppearAnimation.isAnimating = false;
+                    initialAppearAnimation.hasPlayed = true;
+
+                    // Reset to final state
+                    if (objectModel) {
+                        objectModel.traverse((child) => {
+                            if (child.isMesh && child.material) {
+                                child.material.opacity = 1.0;
+                            }
+                        });
+                        const finalScale = objectModelBaseScale * objectModelTransform.scale;
+                        objectModel.scale.set(finalScale, finalScale, finalScale);
+                    }
+                    objectLights.forEach(light => {
+                        light.intensity = light.userData.baseIntensity;
+                    });
+                }
+            }
+
+            // Handle model switch animation
+            if (modelSwitchAnimation.isAnimating) {
+                const elapsed = performance.now() - modelSwitchAnimation.startTime;
+                const progress = Math.min(elapsed / modelSwitchAnimation.duration, 1.0);
+
+                // Ease-in-out cubic function for smooth animation
+                const easeProgress = progress < 0.5
+                    ? 4 * progress * progress * progress
+                    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+                // Calculate opacity for fading models
+                const fadeOutOpacity = 1.0 - easeProgress;
+                const fadeInOpacity = easeProgress;
+
+                // Apply opacity to models
+                if (modelSwitchAnimation.fromModel === 'neon' && loadedModel) {
+                    loadedModel.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material.opacity = fadeOutOpacity;
+                        }
+                    });
+                } else if (modelSwitchAnimation.fromModel === 'object' && objectModel) {
+                    objectModel.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material.opacity = fadeOutOpacity;
+                        }
+                    });
+                }
+
+                if (modelSwitchAnimation.toModel === 'neon' && loadedModel) {
+                    loadedModel.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material.opacity = fadeInOpacity;
+                        }
+                    });
+                } else if (modelSwitchAnimation.toModel === 'object' && objectModel) {
+                    // Add subtle scale animation for incoming model
+                    const scaleProgress = 0.95 + (0.05 * easeProgress);
+                    const baseScale = objectModelBaseScale * objectModelTransform.scale;
+                    objectModel.scale.set(baseScale * scaleProgress, baseScale * scaleProgress, baseScale * scaleProgress);
+
+                    objectModel.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material.opacity = fadeInOpacity;
+                        }
+                    });
+                }
+
+                // Gradually transition bloom effect and point light
+                if (modelSwitchAnimation.toModel === 'neon') {
+                    bloomPass.strength = (2.0 + pulse + flicker) * fadeInOpacity;
+                    if (pointLight) {
+                        pointLight.intensity = (100.0 + (pulse * 20) + (flicker * 30)) * fadeInOpacity;
+                    }
+                    // Fade out object lights
+                    objectLights.forEach(light => {
+                        light.intensity = light.userData.baseIntensity * fadeOutOpacity;
+                    });
+                } else {
+                    bloomPass.strength = (2.0 + pulse + flicker) * fadeOutOpacity;
+                    if (pointLight) {
+                        pointLight.intensity = (100.0 + (pulse * 20) + (flicker * 30)) * fadeOutOpacity;
+                    }
+                    // Fade in object lights
+                    objectLights.forEach(light => {
+                        light.intensity = light.userData.baseIntensity * fadeInOpacity;
+                    });
+                }
+
+                // Animation complete
+                if (progress >= 1.0) {
+                    modelSwitchAnimation.isAnimating = false;
+                    currentModel = modelSwitchAnimation.toModel;
+
+                    // Hide the old model and reset opacity for visible model
+                    if (currentModel === 'neon') {
+                        if (objectModel) objectModel.visible = false;
+                        if (loadedModel) {
+                            loadedModel.traverse((child) => {
+                                if (child.isMesh && child.material) {
+                                    child.material.opacity = 1.0;
+                                }
+                            });
+                        }
+                        bloomPass.enabled = true;
+                        bloomPass.strength = 2.0 + pulse + flicker;
+                        // Turn off object lights when showing neon model
+                        objectLights.forEach(light => {
+                            light.intensity = 0;
+                        });
+                    } else {
+                        if (loadedModel) loadedModel.visible = false;
+                        if (objectModel) {
+                            // Reset scale to final value
+                            const finalScale = objectModelBaseScale * objectModelTransform.scale;
+                            objectModel.scale.set(finalScale, finalScale, finalScale);
+                            objectModel.traverse((child) => {
+                                if (child.isMesh && child.material) {
+                                    child.material.opacity = 1.0;
+                                }
+                            });
+                        }
+                        bloomPass.enabled = false;
+                        // Turn off point light when showing object model
+                        if (pointLight) {
+                            pointLight.intensity = 0;
+                        }
+                        // Restore object lights to full intensity
+                        objectLights.forEach(light => {
+                            light.intensity = light.userData.baseIntensity;
+                        });
+                    }
+                }
             }
 
             updateVideoPlane();
@@ -915,28 +1319,53 @@
         // =========================================================
 
         function switchToModel(modelType) {
+            // Prevent switching if already animating
+            if (modelSwitchAnimation.isAnimating) return;
+
+            // Don't animate if already on this model
+            if (modelType === currentModel) return;
+
+            // Start animation
+            modelSwitchAnimation.isAnimating = true;
+            modelSwitchAnimation.startTime = performance.now();
+            modelSwitchAnimation.fromModel = currentModel;
+            modelSwitchAnimation.toModel = modelType;
+
+            // Make both models visible for cross-fade
+            if (loadedModel) loadedModel.visible = true;
+            if (objectModel) objectModel.visible = true;
+
+            // Set up materials for opacity animation
+            if (loadedModel) {
+                loadedModel.traverse((child) => {
+                    if (child.isMesh && child.material) {
+                        child.material.transparent = true;
+                    }
+                });
+            }
+            if (objectModel) {
+                objectModel.traverse((child) => {
+                    if (child.isMesh && child.material) {
+                        child.material.transparent = true;
+                    }
+                });
+            }
+
+            // Apply saved transform to object model if switching to it
+            if (modelType === 'object' && objectModel) {
+                objectModel.position.set(
+                    objectModelTransform.position.x,
+                    objectModelTransform.position.y,
+                    objectModelTransform.position.z
+                );
+                const finalScale = objectModelBaseScale * objectModelTransform.scale;
+                objectModel.scale.set(finalScale, finalScale, finalScale);
+                objectModel.rotation.y = objectModelTransform.rotation;
+            }
+
+            // Enable bloom pass when switching to neon (so it can fade in)
             if (modelType === 'neon') {
-                if (loadedModel) loadedModel.visible = true;
-                if (objectModel) objectModel.visible = false;
                 bloomPass.enabled = true;
-                currentModel = 'neon';
-            } else if (modelType === 'object') {
-                if (loadedModel) loadedModel.visible = false;
-                if (objectModel) {
-                    objectModel.visible = true;
-                    // Apply saved transform
-                    objectModel.position.set(
-                        objectModelTransform.position.x,
-                        objectModelTransform.position.y,
-                        objectModelTransform.position.z
-                    );
-                    // Use stored base scale multiplied by transform scale
-                    const finalScale = objectModelBaseScale * objectModelTransform.scale;
-                    objectModel.scale.set(finalScale, finalScale, finalScale);
-                    objectModel.rotation.y = objectModelTransform.rotation;
-                }
-                bloomPass.enabled = false;
-                currentModel = 'object';
             }
         }
 
@@ -1216,7 +1645,7 @@
                 // Update text with current date
                 const now = new Date();
                 const dateStr = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
-                document.getElementById('polaroid_text').innerText = `DIESEL TEST ${dateStr}`;
+                document.getElementById('polaroid_text').innerHTML = `<span style="color: red;">DIESEL</span> IS DENIM ${dateStr}`;
 
                 // 3. Start Animation Sequence
                 polaroidContainer.classList.remove('printing');
@@ -1250,6 +1679,14 @@
                 const filename = `Diesel Selfie ${d}.${m}.${y}.png`;
                 shareMedia(currentPhotoBlob, filename);
             }
+        });
+
+        // Tooltip close button
+        const tooltipClose = document.getElementById('tooltip_close');
+        const tooltipContainer = document.getElementById('tooltip_container');
+
+        tooltipClose.addEventListener('click', () => {
+            tooltipContainer.classList.remove('visible');
         });
 
     </script>
