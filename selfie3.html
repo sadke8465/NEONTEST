@@ -499,6 +499,7 @@
         // Model switching state
         let currentModel = 'neon'; // 'neon' or 'object'
         let objectModel = null;
+        let objectModelBaseScale = 1.0; // Store the initial base scale
         let objectModelTransform = {
             position: { x: 0, y: 0, z: 0 },
             scale: 1.0,
@@ -619,6 +620,9 @@
             const targetSize = 3; // Adjust as needed
             const scale = targetSize / maxDim;
             objectModel.scale.set(scale, scale, scale);
+
+            // Store the base scale for future transformations
+            objectModelBaseScale = scale;
 
             // Position in center of screen
             objectModel.position.set(0, 0, 0);
@@ -924,8 +928,9 @@
                         objectModelTransform.position.y,
                         objectModelTransform.position.z
                     );
-                    const baseScale = 3 / Math.max.apply(null, objectModel.scale.toArray());
-                    objectModel.scale.setScalar(baseScale * objectModelTransform.scale);
+                    // Use stored base scale multiplied by transform scale
+                    const finalScale = objectModelBaseScale * objectModelTransform.scale;
+                    objectModel.scale.set(finalScale, finalScale, finalScale);
                     objectModel.rotation.y = objectModelTransform.rotation;
                 }
                 bloomPass.enabled = false;
@@ -1043,8 +1048,9 @@
                 newScale = Math.max(0.5, Math.min(3.0, newScale));
                 objectModelTransform.scale = newScale;
 
-                const baseScale = 3 / Math.max.apply(null, objectModel.scale.toArray().map(s => s / objectModelTransform.scale));
-                objectModel.scale.setScalar(baseScale * newScale);
+                // Apply scale using stored base scale
+                const finalScale = objectModelBaseScale * newScale;
+                objectModel.scale.set(finalScale, finalScale, finalScale);
 
                 // Rotate object
                 if (interactionState.isRotating) {
@@ -1123,8 +1129,9 @@
             newScale = Math.max(0.5, Math.min(3.0, newScale));
             objectModelTransform.scale = newScale;
 
-            const baseScale = 3 / Math.max.apply(null, objectModel.scale.toArray().map(s => s / objectModelTransform.scale));
-            objectModel.scale.setScalar(baseScale * newScale);
+            // Apply scale using stored base scale
+            const finalScale = objectModelBaseScale * newScale;
+            objectModel.scale.set(finalScale, finalScale, finalScale);
         }, { passive: false });
 
 
