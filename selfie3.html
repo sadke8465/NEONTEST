@@ -189,6 +189,36 @@
             }
         }
 
+        /* Switch Model Button (Top Right) */
+        #switch_model_container {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            z-index: 20;
+        }
+
+        #switch_model_btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            color: white;
+            padding: 10px 15px;
+            font-family: monospace;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        #switch_model_btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
         /* Icon Styles */
         .icon {
             width: 24px;
@@ -371,12 +401,17 @@
     <div id="container">
         <div id="status">Initializing...</div>
 
-        <!-- 3. Left Arrow Icon Button -->
+        <!-- Left Arrow Icon Button -->
         <a href="index.html" id="back_btn">
             <svg class="icon" viewBox="0 0 24 24">
                 <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
             </svg>
         </a>
+
+        <!-- Switch Model Button (Top Right) -->
+        <div id="switch_model_container">
+            <div id="switch_model_btn">SWITCH MODEL</div>
+        </div>
 
         <!-- Photobooth Overlay -->
         <div id="photobooth_overlay">
@@ -410,14 +445,14 @@
             </div>
         </div>
 
-        <!-- 2. Switch Camera Icon Button (Right Bottom) - AR Placement -->
+        <!-- 2. Switch Camera Icon Button (Right Bottom) -->
         <div id="ar_switch_container">
             <div id="ar_switch_btn">
-                <!-- Switch Camera Icon -->
+                <!-- Camera Flip Icon -->
                 <svg class="icon" viewBox="0 0 24 24">
                     <path
-                        d="M9 3L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2h-3.17L15 3H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z" />
-                    <path d="M12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+                        d="M20 5h-3.17L15 3H9L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5H5l2.5-2.5L10 13H8c0 2.21 1.79 4 4 4 .58 0 1.14-.13 1.65-.36l1.14 1.14C13.95 17.93 13.02 18 12 18zm2.5-2.5L12 13h2c0-2.21-1.79-4-4-4-.58 0-1.14.13-1.65.36L7.21 8.22C8.05 8.07 8.98 8 10 8c2.76 0 5 2.24 5 5h2l-2.5 2.5z"
+                        fill="currentColor" />
                 </svg>
             </div>
         </div>
@@ -430,514 +465,785 @@
                     <path
                         d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
                 </svg>
-                <!-- Hidden Model Viewer to trigger AR -->
-                <!-- iOS 18 Fix: Using Cloudflare R2 URL with correct MIME type (model/vnd.usdz+zip) -->
-                <model-viewer id="ar_model_viewer" src="blender_test.glb"
-                    ios-src="https://diesel-effect.info/BLENDER_AR_TEST_COMPRESSED.usdz#allowsContentScaling=1" ar
-                    ar-modes="quick-look scene-viewer webxr" ar-scale="auto" ar-placement="floor" camera-controls
-                    touch-action="pan-y" disable-zoom auto-rotate shadow-intensity="1" exposure="1"
-                    environment-image="neutral" loading="eager" reveal="interaction" interaction-prompt="none"
-                    style="position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none;">
-                </model-viewer>
-
-                <script>
-                    // AR Error Handling
-                    const modelViewer = document.getElementById('ar_model_viewer');
-                    modelViewer.addEventListener('ar-status', (event) => {
-                        if (event.detail.status === 'failed') {
-                            const errorMsg = 'AR Session failed to start. Please check if your device supports AR services or try updating Google Play Services for AR.';
-                            console.error(errorMsg);
-                            alert(errorMsg);
-                        }
-                    });
-                </script>
-
-                <a id="download_anchor" style="display:none"></a>
             </div>
-            <video class="input_video" playsinline muted></video>
+        </div>
 
-            <script type="module">
-                import * as THREE from 'three';
-                import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-                import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-                import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-                import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        <a id="download_anchor" style="display:none"></a>
+    </div>
+    <video class="input_video" playsinline muted></video>
 
-                // =========================================================
-                //  === CONFIGURATION ===
-                // =========================================================
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
-                const MODEL_WIDTH_PCT = 0.9;
-                const ROTATION_FIX_Y = 0.0;
-                const VERTICAL_OFFSET = 0.0;
-                const HORIZONTAL_OFFSET = 0.0;
+        // =========================================================
+        //  === CONFIGURATION ===
+        // =========================================================
 
-                const BLOOM_THRESHOLD = 1.5;
-                const BLOOM_STRENGTH = 2.0;
-                const BLOOM_RADIUS = 0.5;
+        const MODEL_WIDTH_PCT = 0.9;
+        const ROTATION_FIX_Y = 0.0;
+        const VERTICAL_OFFSET = 0.0;
+        const HORIZONTAL_OFFSET = 0.0;
 
-                const NEON_COLOR = 0xEB292D;
-                const NEON_INTENSITY_SCALAR = 10.0;
+        const BLOOM_THRESHOLD = 1.5;
+        const BLOOM_STRENGTH = 2.0;
+        const BLOOM_RADIUS = 0.5;
 
-                // =========================================================
-                //  === SETUP ===
-                // =========================================================
+        const NEON_COLOR = 0xEB292D;
+        const NEON_INTENSITY_SCALAR = 10.0;
 
-                const threeCanvas = document.getElementById('three_canvas');
-                const statusText = document.getElementById('status');
-                const videoElement = document.querySelector('.input_video');
+        // Model switching state
+        let currentModel = 'neon'; // 'neon' or 'object'
+        let objectModel = null;
+        let objectModelTransform = {
+            position: { x: 0, y: 0, z: 0 },
+            scale: 1.0,
+            rotation: 0 // Y-axis rotation in radians
+        };
 
-                let width = window.innerWidth;
-                let height = window.innerHeight;
+        // Interaction state for object model
+        let interactionState = {
+            isDragging: false,
+            isScaling: false,
+            isRotating: false,
+            startTouch: null,
+            lastTouch: null,
+            initialDistance: 0,
+            initialScale: 1.0,
+            initialRotation: 0,
+            initialAngle: 0
+        };
 
-                // =========================================================
-                //  === THREE.JS SCENE ===
-                // =========================================================
+        // =========================================================
+        //  === SETUP ===
+        // =========================================================
 
-                const scene = new THREE.Scene();
+        const threeCanvas = document.getElementById('three_canvas');
+        const statusText = document.getElementById('status');
+        const videoElement = document.querySelector('.input_video');
 
-                const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-                camera.position.set(0, 0, 10);
+        let width = window.innerWidth;
+        let height = window.innerHeight;
 
-                const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true, preserveDrawingBuffer: true });
-                renderer.setSize(width, height);
-                renderer.setPixelRatio(window.devicePixelRatio);
-                renderer.toneMapping = THREE.NoToneMapping;
-                renderer.outputColorSpace = THREE.SRGBColorSpace;
+        // =========================================================
+        //  === THREE.JS SCENE ===
+        // =========================================================
 
-                // =========================================================
-                //  === VIDEO BACKGROUND ===
-                // =========================================================
+        const scene = new THREE.Scene();
 
-                const videoTexture = new THREE.VideoTexture(videoElement);
-                videoTexture.colorSpace = THREE.SRGBColorSpace;
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+        camera.position.set(0, 0, 10);
 
-                const videoGeometry = new THREE.PlaneGeometry(1, 1);
-                const videoMaterial = new THREE.MeshStandardMaterial({
-                    map: videoTexture,
-                    side: THREE.DoubleSide,
-                    roughness: 1,
-                    metalness: 0,
-                    color: 0xffffff
-                });
-                const videoPlane = new THREE.Mesh(videoGeometry, videoMaterial);
-                videoPlane.position.z = -10;
-                scene.add(videoPlane);
+        const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true, preserveDrawingBuffer: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.NoToneMapping;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-                // =========================================================
-                //  === NEON SIGN ===
-                // =========================================================
+        // =========================================================
+        //  === VIDEO BACKGROUND ===
+        // =========================================================
 
-                const loader = new GLTFLoader();
-                let loadedModel = null;
-                let pointLight = null;
+        const videoTexture = new THREE.VideoTexture(videoElement);
+        videoTexture.colorSpace = THREE.SRGBColorSpace;
 
-                const neonMaterial = new THREE.MeshBasicMaterial({
-                    color: new THREE.Color(NEON_COLOR).multiplyScalar(NEON_INTENSITY_SCALAR)
-                });
+        const videoGeometry = new THREE.PlaneGeometry(1, 1);
+        const videoMaterial = new THREE.MeshStandardMaterial({
+            map: videoTexture,
+            side: THREE.DoubleSide,
+            roughness: 1,
+            metalness: 0,
+            color: 0xffffff
+        });
+        const videoPlane = new THREE.Mesh(videoGeometry, videoMaterial);
+        videoPlane.position.z = -10;
+        scene.add(videoPlane);
 
-                loader.load('./model.gltf', function (gltf) {
-                    loadedModel = gltf.scene;
+        // =========================================================
+        //  === NEON SIGN ===
+        // =========================================================
 
-                    loadedModel.traverse((child) => {
-                        if (child.isMesh) child.material = neonMaterial;
-                    });
+        const loader = new GLTFLoader();
+        let loadedModel = null;
+        let pointLight = null;
 
-                    const box = new THREE.Box3().setFromObject(loadedModel);
-                    const center = box.getCenter(new THREE.Vector3());
-                    loadedModel.position.sub(center);
+        const neonMaterial = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(NEON_COLOR).multiplyScalar(NEON_INTENSITY_SCALAR)
+        });
 
-                    pointLight = new THREE.PointLight(NEON_COLOR, 100, 50);
-                    pointLight.position.set(0, 0, 2);
-                    loadedModel.add(pointLight);
+        // Load neon sign model
+        loader.load('./model.gltf', function (gltf) {
+            loadedModel = gltf.scene;
 
-                    scene.add(loadedModel);
-                    fitModelToCamera();
+            loadedModel.traverse((child) => {
+                if (child.isMesh) child.material = neonMaterial;
+            });
 
-                }, undefined, function (error) {
-                    console.error(error);
-                });
+            const box = new THREE.Box3().setFromObject(loadedModel);
+            const center = box.getCenter(new THREE.Vector3());
+            loadedModel.position.sub(center);
 
-                const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
-                scene.add(ambientLight);
+            pointLight = new THREE.PointLight(NEON_COLOR, 100, 50);
+            pointLight.position.set(0, 0, 2);
+            loadedModel.add(pointLight);
 
-                // =========================================================
-                //  === POST-PROCESSING ===
-                // =========================================================
+            scene.add(loadedModel);
+            fitModelToCamera();
 
-                const renderScene = new RenderPass(scene, camera);
+        }, undefined, function (error) {
+            console.error('Error loading neon model:', error);
+        });
 
-                const bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 1.5, 0.4, 0.85);
-                bloomPass.threshold = BLOOM_THRESHOLD;
-                bloomPass.strength = BLOOM_STRENGTH;
-                bloomPass.radius = BLOOM_RADIUS;
+        // Load BLENDER_TEST_UV_COMPRESSED.glb model
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+        const objectLoader = new GLTFLoader();
+        objectLoader.setDRACOLoader(dracoLoader);
 
-                const renderTarget = new THREE.WebGLRenderTarget(width, height, {
-                    type: THREE.HalfFloatType,
-                    format: THREE.RGBAFormat,
-                });
+        objectLoader.load('./BLENDER_TEST_UV_COMPRESSED.glb', function (gltf) {
+            objectModel = gltf.scene;
 
-                const composer = new EffectComposer(renderer, renderTarget);
-                composer.addPass(renderScene);
-                composer.addPass(bloomPass);
+            // Center and scale the object model
+            const box = new THREE.Box3().setFromObject(objectModel);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
 
-                // =========================================================
-                //  === CAMERA SETUP ===
-                // =========================================================
+            objectModel.position.sub(center);
 
-                async function startCamera() {
-                    // Stop existing tracks to ensure clean restart
-                    if (videoElement.srcObject) {
-                        const tracks = videoElement.srcObject.getTracks();
-                        tracks.forEach(track => track.stop());
+            // Scale to reasonable size (similar to neon sign)
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const targetSize = 3; // Adjust as needed
+            const scale = targetSize / maxDim;
+            objectModel.scale.set(scale, scale, scale);
+
+            // Position in center of screen
+            objectModel.position.set(0, 0, 0);
+            objectModel.visible = false; // Hidden by default
+
+            scene.add(objectModel);
+            console.log('Object model loaded successfully');
+
+        }, undefined, function (error) {
+            console.error('Error loading object model:', error);
+        });
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+        scene.add(ambientLight);
+
+        // Add directional light for object model
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(2, 3, 5);
+        scene.add(dirLight);
+
+        // =========================================================
+        //  === POST-PROCESSING ===
+        // =========================================================
+
+        const renderScene = new RenderPass(scene, camera);
+
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 1.5, 0.4, 0.85);
+        bloomPass.threshold = BLOOM_THRESHOLD;
+        bloomPass.strength = BLOOM_STRENGTH;
+        bloomPass.radius = BLOOM_RADIUS;
+
+        const renderTarget = new THREE.WebGLRenderTarget(width, height, {
+            type: THREE.HalfFloatType,
+            format: THREE.RGBAFormat,
+        });
+
+        const composer = new EffectComposer(renderer, renderTarget);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // =========================================================
+        //  === CAMERA SETUP ===
+        // =========================================================
+
+        // Camera facing mode state
+        let currentFacingMode = 'user'; // Start with front camera (selfie)
+
+        async function startCamera(facingMode = 'user') {
+            // Stop existing tracks to ensure clean restart
+            if (videoElement.srcObject) {
+                const tracks = videoElement.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
                     }
+                });
+                videoElement.srcObject = stream;
+                await videoElement.play();
+                currentFacingMode = facingMode; // Update state on success
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+            }
+        }
+        startCamera();
 
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({
-                            video: {
-                                facingMode: 'user',
-                                width: { ideal: 1280 },
-                                height: { ideal: 720 }
-                            }
+        // Camera health monitoring
+        let cameraIssueDetected = false;
+        const restartCameraContainer = document.getElementById('restart_camera_container');
+        const restartCameraBtn = document.getElementById('restart_camera_btn');
+
+        function showRestartButton() {
+            if (!cameraIssueDetected) {
+                cameraIssueDetected = true;
+                restartCameraContainer.classList.add('visible');
+            }
+        }
+
+        function hideRestartButton() {
+            cameraIssueDetected = false;
+            restartCameraContainer.classList.remove('visible');
+        }
+
+        // Manual restart button click handler
+        restartCameraBtn.addEventListener('click', () => {
+            console.log('Manual camera restart triggered');
+            hideRestartButton();
+            startCamera();
+        });
+
+        // Monitor video play state
+        let lastFrameTime = videoElement.currentTime;
+        let frameFrozenCount = 0;
+
+        setInterval(() => {
+            if (videoElement.srcObject && !videoElement.paused) {
+                if (videoElement.currentTime === lastFrameTime) {
+                    frameFrozenCount++;
+                    if (frameFrozenCount > 3) { // 3 seconds frozen
+                        console.log('Camera appears frozen (no new frames)');
+                        showRestartButton();
+                    }
+                } else {
+                    frameFrozenCount = 0;
+                    lastFrameTime = videoElement.currentTime;
+                    if (cameraIssueDetected) {
+                        hideRestartButton();
+                    }
+                }
+            }
+        }, 1000);
+
+        // Re-initialize camera when returning to the tab (e.g. from AR view)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                // iOS AR Fix: Clean up viewer on return to ensure fresh session next time
+                const arViewer = document.getElementById('ar_model_viewer');
+                if (arViewer) arViewer.remove();
+
+                // Small delay to let the page fully restore
+                setTimeout(() => {
+                    const stream = videoElement.srcObject;
+                    const isPaused = videoElement.paused;
+                    const isEnded = videoElement.ended;
+
+                    let needsRestart = false;
+
+                    if (!stream || !stream.active) {
+                        console.log('No active stream detected after visibility change');
+                        needsRestart = true;
+                    } else if (isPaused || isEnded) {
+                        // Try to resume first
+                        videoElement.play().catch(() => {
+                            console.log("Resume failed, restarting camera...");
+                            needsRestart = true;
                         });
-                        videoElement.srcObject = stream;
-                        await videoElement.play();
-                    } catch (err) {
-                        console.error("Error accessing camera:", err);
-                    }
-                }
-                startCamera();
-
-                // Camera health monitoring
-                let cameraIssueDetected = false;
-                const restartCameraContainer = document.getElementById('restart_camera_container');
-                const restartCameraBtn = document.getElementById('restart_camera_btn');
-
-                function showRestartButton() {
-                    if (!cameraIssueDetected) {
-                        cameraIssueDetected = true;
-                        restartCameraContainer.classList.add('visible');
-                    }
-                }
-
-                function hideRestartButton() {
-                    cameraIssueDetected = false;
-                    restartCameraContainer.classList.remove('visible');
-                }
-
-                // Manual restart button click handler
-                restartCameraBtn.addEventListener('click', () => {
-                    console.log('Manual camera restart triggered');
-                    hideRestartButton();
-                    startCamera();
-                });
-
-                // Monitor video play state
-                let lastFrameTime = videoElement.currentTime;
-                let frameFrozenCount = 0;
-
-                setInterval(() => {
-                    if (videoElement.srcObject && !videoElement.paused) {
-                        if (videoElement.currentTime === lastFrameTime) {
-                            frameFrozenCount++;
-                            if (frameFrozenCount > 3) { // 3 seconds frozen
-                                console.log('Camera appears frozen (no new frames)');
-                                showRestartButton();
-                            }
-                        } else {
-                            frameFrozenCount = 0;
-                            lastFrameTime = videoElement.currentTime;
-                            if (cameraIssueDetected) {
-                                hideRestartButton();
-                            }
+                    } else {
+                        // Check individual tracks
+                        const tracks = stream.getVideoTracks();
+                        if (tracks.length === 0) {
+                            console.log('No video tracks found');
+                            needsRestart = true;
+                        } else if (tracks[0].readyState === 'ended' || tracks[0].muted) {
+                            console.log('Video track ended or muted');
+                            needsRestart = true;
                         }
                     }
-                }, 1000);
 
-                // Re-initialize camera when returning to the tab (e.g. from AR view)
-                document.addEventListener('visibilitychange', () => {
-                    if (document.visibilityState === 'visible') {
-                        // iOS AR Fix: Clean up viewer on return to ensure fresh session next time
-                        const arViewer = document.getElementById('ar_model_viewer');
-                        if (arViewer) arViewer.remove();
-
-                        // Small delay to let the page fully restore
+                    if (needsRestart) {
+                        console.log("Camera needs restart after visibility change.");
+                        showRestartButton();
+                        // Auto-restart after showing button
                         setTimeout(() => {
-                            const stream = videoElement.srcObject;
-                            const isPaused = videoElement.paused;
-                            const isEnded = videoElement.ended;
-
-                            let needsRestart = false;
-
-                            if (!stream || !stream.active) {
-                                console.log('No active stream detected after visibility change');
-                                needsRestart = true;
-                            } else if (isPaused || isEnded) {
-                                // Try to resume first
-                                videoElement.play().catch(() => {
-                                    console.log("Resume failed, restarting camera...");
-                                    needsRestart = true;
-                                });
-                            } else {
-                                // Check individual tracks
-                                const tracks = stream.getVideoTracks();
-                                if (tracks.length === 0) {
-                                    console.log('No video tracks found');
-                                    needsRestart = true;
-                                } else if (tracks[0].readyState === 'ended' || tracks[0].muted) {
-                                    console.log('Video track ended or muted');
-                                    needsRestart = true;
-                                }
-                            }
-
-                            if (needsRestart) {
-                                console.log("Camera needs restart after visibility change.");
-                                showRestartButton();
-                                // Auto-restart after showing button
-                                setTimeout(() => {
-                                    startCamera().then(() => {
-                                        hideRestartButton();
-                                    });
-                                }, 500);
-                            }
-                        }, 300);
-                    }
-                });
-
-                // Also listen to page focus events (backup for iOS)
-                window.addEventListener('focus', () => {
-                    setTimeout(() => {
-                        const stream = videoElement.srcObject;
-                        if (!stream || !stream.active) {
-                            console.log('Camera inactive on focus, attempting restart');
-                            showRestartButton();
-                            setTimeout(() => {
-                                startCamera().then(() => {
-                                    hideRestartButton();
-                                });
-                            }, 500);
-                        }
-                    }, 300);
-                });
-
-                // =========================================================
-                //  === POSITIONING LOGIC ===
-                // =========================================================
-
-                function fitModelToCamera() {
-                    if (!loadedModel) return;
-
-                    loadedModel.rotation.set(0, 0, 0);
-                    loadedModel.scale.set(1, 1, 1);
-                    loadedModel.position.set(0, 0, 0);
-                    loadedModel.updateMatrixWorld(true);
-
-                    const dist = camera.position.z;
-                    const vFOV = THREE.MathUtils.degToRad(camera.fov);
-                    const visibleHeight = 2 * Math.tan(vFOV / 2) * dist;
-                    const visibleWidth = visibleHeight * camera.aspect;
-
-                    const box = new THREE.Box3().setFromObject(loadedModel);
-                    const size = new THREE.Vector3();
-                    box.getSize(size);
-                    const center = new THREE.Vector3();
-                    box.getCenter(center);
-
-                    let scaleFactor = (visibleWidth / size.x) * MODEL_WIDTH_PCT;
-                    loadedModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
-
-                    const scaledMaxZ = box.max.z * scaleFactor;
-                    loadedModel.position.z = -scaledMaxZ;
-
-                    const scaledTopY = box.max.y * scaleFactor;
-                    const targetTopY = visibleHeight / 2;
-                    const topPadding = visibleHeight * 0.05;
-
-                    loadedModel.position.y = (targetTopY - scaledTopY - topPadding) + VERTICAL_OFFSET;
-
-                    const scaledCenterX = center.x * scaleFactor;
-                    loadedModel.position.x = -scaledCenterX + HORIZONTAL_OFFSET;
-
-                    loadedModel.rotation.y = ROTATION_FIX_Y;
-                }
-
-                function updateVideoPlane() {
-                    if (videoElement.readyState < videoElement.HAVE_ENOUGH_DATA) return;
-
-                    const videoW = videoElement.videoWidth;
-                    const videoH = videoElement.videoHeight;
-                    const videoAspect = videoW / videoH;
-                    const screenAspect = width / height;
-
-                    const distance = camera.position.z - videoPlane.position.z;
-                    const vFOV = THREE.MathUtils.degToRad(camera.fov);
-                    const visibleHeight = 2 * Math.tan(vFOV / 2) * distance;
-                    const visibleWidth = visibleHeight * camera.aspect;
-
-                    let scaleX, scaleY;
-
-                    if (screenAspect > videoAspect) {
-                        scaleX = visibleWidth;
-                        scaleY = visibleWidth / videoAspect;
-                    } else {
-                        scaleY = visibleHeight;
-                        scaleX = visibleHeight * videoAspect;
-                    }
-
-                    videoPlane.scale.set(-scaleX, scaleY, 1);
-                }
-
-                function handleResize() {
-                    width = window.innerWidth;
-                    height = window.innerHeight;
-
-                    camera.aspect = width / height;
-                    camera.updateProjectionMatrix();
-                    renderer.setSize(width, height);
-                    composer.setSize(width, height);
-
-                    fitModelToCamera();
-                    updateVideoPlane();
-                }
-
-                window.addEventListener('resize', handleResize);
-                videoElement.addEventListener('loadedmetadata', updateVideoPlane);
-
-                function animate() {
-                    requestAnimationFrame(animate);
-
-                    const time = Date.now() * 0.005;
-
-                    const flicker = Math.random() > 0.9 ? Math.random() * 0.5 : 0;
-                    const pulse = Math.sin(time * 2) * 0.1;
-
-                    bloomPass.strength = 2.0 + pulse + flicker;
-
-                    if (pointLight) {
-                        pointLight.intensity = 100.0 + (pulse * 20) + (flicker * 30);
-                    }
-
-                    updateVideoPlane();
-                    composer.render();
-                }
-                animate();
-
-                // =========================================================
-                //  === CAPTURE & PHOTOBOOTH LOGIC ===
-                // =========================================================
-
-                const captureBtn = document.getElementById('capture_btn');
-                const downloadAnchor = document.getElementById('download_anchor');
-                const photoboothOverlay = document.getElementById('photobooth_overlay');
-                const polaroidContainer = document.getElementById('polaroid_container');
-                const polaroidImage = document.getElementById('polaroid_image');
-                const postCaptureUi = document.getElementById('post_capture_ui');
-                const pbTakeAgainBtn = document.getElementById('pb_take_again');
-                const pbShareBtn = document.getElementById('pb_share');
-
-                let currentPhotoBlob = null;
-
-                function getCompositeCanvas() {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = threeCanvas.width;
-                    canvas.height = threeCanvas.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(threeCanvas, 0, 0, canvas.width, canvas.height);
-                    return canvas;
-                }
-
-                async function shareMedia(blob, filename) {
-                    const file = new File([blob], filename, { type: blob.type });
-                    if (navigator.share) {
-                        try {
-                            await navigator.share({
-                                files: [file],
-                                title: 'Diesel Selfie',
-                                text: 'DIESEL\nDENIM - THE COLLECTION\nhttps://diesel.co.il/\nhttps://diesel-effect.com/'
+                            startCamera().then(() => {
+                                hideRestartButton();
                             });
-                        } catch (err) {
-                            console.warn('Share failed or cancelled:', err);
-                            if (err.name !== 'AbortError') {
-                                downloadMedia(blob, filename);
-                            }
-                        }
-                    } else {
+                        }, 500);
+                    }
+                }, 300);
+            }
+        });
+
+        // Also listen to page focus events (backup for iOS)
+        window.addEventListener('focus', () => {
+            setTimeout(() => {
+                const stream = videoElement.srcObject;
+                if (!stream || !stream.active) {
+                    console.log('Camera inactive on focus, attempting restart');
+                    showRestartButton();
+                    setTimeout(() => {
+                        startCamera().then(() => {
+                            hideRestartButton();
+                        });
+                    }, 500);
+                }
+            }, 300);
+        });
+
+        // =========================================================
+        //  === POSITIONING LOGIC ===
+        // =========================================================
+
+        function fitModelToCamera() {
+            if (!loadedModel) return;
+
+            loadedModel.rotation.set(0, 0, 0);
+            loadedModel.scale.set(1, 1, 1);
+            loadedModel.position.set(0, 0, 0);
+            loadedModel.updateMatrixWorld(true);
+
+            const dist = camera.position.z;
+            const vFOV = THREE.MathUtils.degToRad(camera.fov);
+            const visibleHeight = 2 * Math.tan(vFOV / 2) * dist;
+            const visibleWidth = visibleHeight * camera.aspect;
+
+            const box = new THREE.Box3().setFromObject(loadedModel);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+
+            let scaleFactor = (visibleWidth / size.x) * MODEL_WIDTH_PCT;
+            loadedModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+            const scaledMaxZ = box.max.z * scaleFactor;
+            loadedModel.position.z = -scaledMaxZ;
+
+            const scaledTopY = box.max.y * scaleFactor;
+            const targetTopY = visibleHeight / 2;
+            const topPadding = visibleHeight * 0.05;
+
+            loadedModel.position.y = (targetTopY - scaledTopY - topPadding) + VERTICAL_OFFSET;
+
+            const scaledCenterX = center.x * scaleFactor;
+            loadedModel.position.x = -scaledCenterX + HORIZONTAL_OFFSET;
+
+            loadedModel.rotation.y = ROTATION_FIX_Y;
+        }
+
+        function updateVideoPlane() {
+            if (videoElement.readyState < videoElement.HAVE_ENOUGH_DATA) return;
+
+            const videoW = videoElement.videoWidth;
+            const videoH = videoElement.videoHeight;
+            const videoAspect = videoW / videoH;
+            const screenAspect = width / height;
+
+            const distance = camera.position.z - videoPlane.position.z;
+            const vFOV = THREE.MathUtils.degToRad(camera.fov);
+            const visibleHeight = 2 * Math.tan(vFOV / 2) * distance;
+            const visibleWidth = visibleHeight * camera.aspect;
+
+            let scaleX, scaleY;
+
+            if (screenAspect > videoAspect) {
+                scaleX = visibleWidth;
+                scaleY = visibleWidth / videoAspect;
+            } else {
+                scaleY = visibleHeight;
+                scaleX = visibleHeight * videoAspect;
+            }
+
+            videoPlane.scale.set(-scaleX, scaleY, 1);
+        }
+
+        function handleResize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+
+            fitModelToCamera();
+            updateVideoPlane();
+        }
+
+        window.addEventListener('resize', handleResize);
+        videoElement.addEventListener('loadedmetadata', updateVideoPlane);
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.005;
+
+            const flicker = Math.random() > 0.9 ? Math.random() * 0.5 : 0;
+            const pulse = Math.sin(time * 2) * 0.1;
+
+            bloomPass.strength = 2.0 + pulse + flicker;
+
+            if (pointLight) {
+                pointLight.intensity = 100.0 + (pulse * 20) + (flicker * 30);
+            }
+
+            updateVideoPlane();
+            composer.render();
+        }
+        animate();
+
+        // =========================================================
+        //  === MODEL SWITCHING LOGIC ===
+        // =========================================================
+
+        function switchToModel(modelType) {
+            if (modelType === 'neon') {
+                if (loadedModel) loadedModel.visible = true;
+                if (objectModel) objectModel.visible = false;
+                bloomPass.enabled = true;
+                currentModel = 'neon';
+            } else if (modelType === 'object') {
+                if (loadedModel) loadedModel.visible = false;
+                if (objectModel) {
+                    objectModel.visible = true;
+                    // Apply saved transform
+                    objectModel.position.set(
+                        objectModelTransform.position.x,
+                        objectModelTransform.position.y,
+                        objectModelTransform.position.z
+                    );
+                    const baseScale = 3 / Math.max.apply(null, objectModel.scale.toArray());
+                    objectModel.scale.setScalar(baseScale * objectModelTransform.scale);
+                    objectModel.rotation.y = objectModelTransform.rotation;
+                }
+                bloomPass.enabled = false;
+                currentModel = 'object';
+            }
+        }
+
+        // Switch Model Button Handler
+        const switchModelBtn = document.getElementById('switch_model_btn');
+        switchModelBtn.addEventListener('click', () => {
+            const newModel = currentModel === 'neon' ? 'object' : 'neon';
+            switchToModel(newModel);
+            console.log(`Switched to ${newModel} model`);
+        });
+
+        // =========================================================
+        //  === INTERACTIVE CONTROLS FOR OBJECT MODEL ===
+        // =========================================================
+
+        // Helper functions
+        function getTouchCenter(touches) {
+            let x = 0, y = 0;
+            for (let i = 0; i < touches.length; i++) {
+                x += touches[i].clientX;
+                y += touches[i].clientY;
+            }
+            return { x: x / touches.length, y: y / touches.length };
+        }
+
+        function getTouchDistance(touch1, touch2) {
+            const dx = touch2.clientX - touch1.clientX;
+            const dy = touch2.clientY - touch1.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function getTouchAngle(touch1, touch2) {
+            return Math.atan2(
+                touch2.clientY - touch1.clientY,
+                touch2.clientX - touch1.clientX
+            );
+        }
+
+        function screenToWorld(screenX, screenY) {
+            const rect = threeCanvas.getBoundingClientRect();
+            const x = ((screenX - rect.left) / rect.width) * 2 - 1;
+            const y = -((screenY - rect.top) / rect.height) * 2 + 1;
+
+            const distance = camera.position.z;
+            const vFOV = THREE.MathUtils.degToRad(camera.fov);
+            const visibleHeight = 2 * Math.tan(vFOV / 2) * distance;
+            const visibleWidth = visibleHeight * camera.aspect;
+
+            return {
+                x: x * visibleWidth / 2,
+                y: y * visibleHeight / 2
+            };
+        }
+
+        // Touch event handlers
+        threeCanvas.addEventListener('touchstart', (e) => {
+            if (currentModel !== 'object' || !objectModel) return;
+
+            e.preventDefault();
+
+            if (e.touches.length === 1) {
+                // Single touch - drag to move
+                interactionState.isDragging = true;
+                const touch = e.touches[0];
+                const worldPos = screenToWorld(touch.clientX, touch.clientY);
+                interactionState.startTouch = worldPos;
+                interactionState.lastTouch = worldPos;
+            } else if (e.touches.length === 2) {
+                // Two fingers - scale and rotate
+                interactionState.isDragging = false;
+                interactionState.isScaling = true;
+                interactionState.isRotating = true;
+
+                const distance = getTouchDistance(e.touches[0], e.touches[1]);
+                interactionState.initialDistance = distance;
+                interactionState.initialScale = objectModelTransform.scale;
+
+                const angle = getTouchAngle(e.touches[0], e.touches[1]);
+                interactionState.initialAngle = angle;
+                interactionState.initialRotation = objectModelTransform.rotation;
+            }
+        }, { passive: false });
+
+        threeCanvas.addEventListener('touchmove', (e) => {
+            if (currentModel !== 'object' || !objectModel) return;
+
+            e.preventDefault();
+
+            if (e.touches.length === 1 && interactionState.isDragging) {
+                // Move object
+                const touch = e.touches[0];
+                const worldPos = screenToWorld(touch.clientX, touch.clientY);
+
+                const deltaX = worldPos.x - interactionState.lastTouch.x;
+                const deltaY = worldPos.y - interactionState.lastTouch.y;
+
+                objectModelTransform.position.x += deltaX;
+                objectModelTransform.position.y += deltaY;
+
+                objectModel.position.x = objectModelTransform.position.x;
+                objectModel.position.y = objectModelTransform.position.y;
+
+                interactionState.lastTouch = worldPos;
+            } else if (e.touches.length === 2 && interactionState.isScaling) {
+                // Scale object
+                const distance = getTouchDistance(e.touches[0], e.touches[1]);
+                const scaleChange = distance / interactionState.initialDistance;
+                let newScale = interactionState.initialScale * scaleChange;
+
+                // Clamp scale between 0.5x and 3x
+                newScale = Math.max(0.5, Math.min(3.0, newScale));
+                objectModelTransform.scale = newScale;
+
+                const baseScale = 3 / Math.max.apply(null, objectModel.scale.toArray().map(s => s / objectModelTransform.scale));
+                objectModel.scale.setScalar(baseScale * newScale);
+
+                // Rotate object
+                if (interactionState.isRotating) {
+                    const angle = getTouchAngle(e.touches[0], e.touches[1]);
+                    const angleDelta = angle - interactionState.initialAngle;
+                    let newRotation = interactionState.initialRotation + angleDelta;
+
+                    // Clamp rotation to ±30 degrees (±0.524 radians)
+                    const maxRotation = THREE.MathUtils.degToRad(30);
+                    newRotation = Math.max(-maxRotation, Math.min(maxRotation, newRotation));
+                    objectModelTransform.rotation = newRotation;
+
+                    objectModel.rotation.y = newRotation;
+                }
+            }
+        }, { passive: false });
+
+        threeCanvas.addEventListener('touchend', (e) => {
+            if (currentModel !== 'object') return;
+
+            interactionState.isDragging = false;
+            interactionState.isScaling = false;
+            interactionState.isRotating = false;
+        });
+
+        // Mouse event handlers (for desktop)
+        let mouseDown = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+
+        threeCanvas.addEventListener('mousedown', (e) => {
+            if (currentModel !== 'object' || !objectModel) return;
+
+            mouseDown = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+
+        threeCanvas.addEventListener('mousemove', (e) => {
+            if (currentModel !== 'object' || !objectModel || !mouseDown) return;
+
+            const deltaX = e.clientX - lastMouseX;
+            const deltaY = e.clientY - lastMouseY;
+
+            const worldDeltaX = (deltaX / width) * 20; // Adjust sensitivity
+            const worldDeltaY = -(deltaY / height) * 20;
+
+            objectModelTransform.position.x += worldDeltaX;
+            objectModelTransform.position.y += worldDeltaY;
+
+            objectModel.position.x = objectModelTransform.position.x;
+            objectModel.position.y = objectModelTransform.position.y;
+
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+
+        threeCanvas.addEventListener('mouseup', () => {
+            mouseDown = false;
+        });
+
+        threeCanvas.addEventListener('mouseleave', () => {
+            mouseDown = false;
+        });
+
+        // Mouse wheel for scaling
+        threeCanvas.addEventListener('wheel', (e) => {
+            if (currentModel !== 'object' || !objectModel) return;
+
+            e.preventDefault();
+
+            const scaleDelta = e.deltaY > 0 ? 0.95 : 1.05;
+            let newScale = objectModelTransform.scale * scaleDelta;
+
+            // Clamp scale
+            newScale = Math.max(0.5, Math.min(3.0, newScale));
+            objectModelTransform.scale = newScale;
+
+            const baseScale = 3 / Math.max.apply(null, objectModel.scale.toArray().map(s => s / objectModelTransform.scale));
+            objectModel.scale.setScalar(baseScale * newScale);
+        }, { passive: false });
+
+
+
+        // =========================================================
+        //  === CAPTURE & PHOTOBOOTH LOGIC ===
+        // =========================================================
+
+        const captureBtn = document.getElementById('capture_btn');
+        const downloadAnchor = document.getElementById('download_anchor');
+        const photoboothOverlay = document.getElementById('photobooth_overlay');
+        const polaroidContainer = document.getElementById('polaroid_container');
+        const polaroidImage = document.getElementById('polaroid_image');
+        const postCaptureUi = document.getElementById('post_capture_ui');
+        const pbTakeAgainBtn = document.getElementById('pb_take_again');
+        const pbShareBtn = document.getElementById('pb_share');
+
+        let currentPhotoBlob = null;
+
+        function getCompositeCanvas() {
+            const canvas = document.createElement('canvas');
+            canvas.width = threeCanvas.width;
+            canvas.height = threeCanvas.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(threeCanvas, 0, 0, canvas.width, canvas.height);
+            return canvas;
+        }
+
+        async function shareMedia(blob, filename) {
+            const file = new File([blob], filename, { type: blob.type });
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Diesel Selfie',
+                        text: 'DIESEL\nDENIM - THE COLLECTION\nhttps://diesel.co.il/\nhttps://diesel-effect.com/'
+                    });
+                } catch (err) {
+                    console.warn('Share failed or cancelled:', err);
+                    if (err.name !== 'AbortError') {
                         downloadMedia(blob, filename);
                     }
                 }
+            } else {
+                downloadMedia(blob, filename);
+            }
+        }
 
-                function downloadMedia(blob, filename) {
-                    const url = URL.createObjectURL(blob);
-                    downloadAnchor.href = url;
-                    downloadAnchor.download = filename;
-                    downloadAnchor.click();
-                    URL.revokeObjectURL(url);
-                }
+        function downloadMedia(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            downloadAnchor.href = url;
+            downloadAnchor.download = filename;
+            downloadAnchor.click();
+            URL.revokeObjectURL(url);
+        }
 
-                const photoboothBtn = document.getElementById('photobooth_btn'); // Kept variable but replaced ID logic to be cleanup if needed
+        // Camera Switch Logic
+        const arSwitchBtn = document.getElementById('ar_switch_btn');
 
-                // AR Switch Logic
-                const arSwitchBtn = document.getElementById('ar_switch_btn');
-                const arModelViewer = document.getElementById('ar_model_viewer');
+        arSwitchBtn.addEventListener('click', () => {
+            // Toggle between front (user) and back (environment) cameras
+            const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            console.log(`Switching camera from ${currentFacingMode} to ${newFacingMode}`);
+            startCamera(newFacingMode);
+        });
 
-                arSwitchBtn.addEventListener('click', () => {
-                    // Open available AR in the same tab, which lets us define a "Back" button there
-                    window.location.href = 'ar-launch.html?t=' + Date.now();
-                });
+        // Capture Button Click - Triggers Photobooth Mode
+        captureBtn.addEventListener('click', () => {
+            // 1. Capture immediately
+            const canvas = getCompositeCanvas();
 
-                // Capture Button Click - Triggers Photobooth Mode
-                captureBtn.addEventListener('click', () => {
-                    // 1. Capture immediately
-                    const canvas = getCompositeCanvas();
+            // 2. Fade to black
+            photoboothOverlay.classList.add('active');
 
-                    // 2. Fade to black
-                    photoboothOverlay.classList.add('active');
+            canvas.toBlob(blob => {
+                currentPhotoBlob = blob;
+                const url = URL.createObjectURL(blob);
+                polaroidImage.src = url;
 
-                    canvas.toBlob(blob => {
-                        currentPhotoBlob = blob;
-                        const url = URL.createObjectURL(blob);
-                        polaroidImage.src = url;
+                // Update text with current date
+                const now = new Date();
+                const dateStr = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
+                document.getElementById('polaroid_text').innerText = `DIESEL TEST ${dateStr}`;
 
-                        // Update text with current date
-                        const now = new Date();
-                        const dateStr = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
-                        document.getElementById('polaroid_text').innerText = `DIESEL TEST ${dateStr}`;
+                // 3. Start Animation Sequence
+                polaroidContainer.classList.remove('printing');
+                void polaroidContainer.offsetWidth; // trigger reflow
+                polaroidContainer.classList.add('printing');
 
-                        // 3. Start Animation Sequence
-                        polaroidContainer.classList.remove('printing');
-                        void polaroidContainer.offsetWidth; // trigger reflow
-                        polaroidContainer.classList.add('printing');
+                // Show UI Buttons after animation
+                postCaptureUi.classList.add('visible');
 
-                        // Show UI Buttons after animation
-                        postCaptureUi.classList.add('visible');
+            }, 'image/png');
+        });
 
-                    }, 'image/png');
-                });
+        pbTakeAgainBtn.addEventListener('click', () => {
+            postCaptureUi.classList.remove('visible');
+            photoboothOverlay.classList.remove('active');
+            polaroidContainer.classList.remove('printing');
 
-                pbTakeAgainBtn.addEventListener('click', () => {
-                    postCaptureUi.classList.remove('visible');
-                    photoboothOverlay.classList.remove('active');
-                    polaroidContainer.classList.remove('printing');
+            if (polaroidImage.src) {
+                URL.revokeObjectURL(polaroidImage.src);
+                polaroidImage.src = '';
+            }
+            currentPhotoBlob = null;
+        });
 
-                    if (polaroidImage.src) {
-                        URL.revokeObjectURL(polaroidImage.src);
-                        polaroidImage.src = '';
-                    }
-                    currentPhotoBlob = null;
-                });
+        pbShareBtn.addEventListener('click', () => {
+            if (currentPhotoBlob) {
+                const now = new Date();
+                const d = String(now.getDate()).padStart(2, '0');
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const y = String(now.getFullYear()).slice(-2);
+                const filename = `Diesel Selfie ${d}.${m}.${y}.png`;
+                shareMedia(currentPhotoBlob, filename);
+            }
+        });
 
-                pbShareBtn.addEventListener('click', () => {
-                    if (currentPhotoBlob) {
-                        const now = new Date();
-                        const d = String(now.getDate()).padStart(2, '0');
-                        const m = String(now.getMonth() + 1).padStart(2, '0');
-                        const y = String(now.getFullYear()).slice(-2);
-                        const filename = `Diesel Selfie ${d}.${m}.${y}.png`;
-                        shareMedia(currentPhotoBlob, filename);
-                    }
-                });
-
-            </script>
+    </script>
 </body>
 
 </html>
