@@ -870,7 +870,9 @@
                 scaleX = visibleHeight * videoAspect;
             }
 
-            videoPlane.scale.set(-scaleX, scaleY, 1);
+            // Only flip horizontally for front camera (user), not back camera (environment)
+            const flipX = currentFacingMode === 'user' ? -1 : 1;
+            videoPlane.scale.set(flipX * scaleX, scaleY, 1);
         }
 
         function handleResize() {
