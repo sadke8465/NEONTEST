@@ -1059,7 +1059,7 @@
                     let newRotation = interactionState.initialRotation + angleDelta;
 
                     // Clamp rotation to ±30 degrees (±0.524 radians)
-                    const maxRotation = THREE.MathUtils.degToRad(30);
+                    const maxRotation = THREE.MathUtils.degToRad(50);
                     newRotation = Math.max(-maxRotation, Math.min(maxRotation, newRotation));
                     objectModelTransform.rotation = newRotation;
 
