@@ -1600,21 +1600,44 @@
                 const polaroid = document.getElementById('polaroid_container');
                 if (!polaroid) return null;
 
-                // Get the computed bounds
-                const rect = polaroid.getBoundingClientRect();
+                // Get viewport dimensions for the black background
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
 
-                // Create a canvas with the same dimensions as the polaroid
+                // Create a canvas matching the viewport size
                 const canvas = document.createElement('canvas');
                 const scale = window.devicePixelRatio || 1;
-                canvas.width = rect.width * scale;
-                canvas.height = rect.height * scale;
+                canvas.width = viewportWidth * scale;
+                canvas.height = viewportHeight * scale;
 
                 const ctx = canvas.getContext('2d');
                 ctx.scale(scale, scale);
 
+                // Fill black background
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, viewportWidth, viewportHeight);
+
+                // Get polaroid dimensions and position
+                const rect = polaroid.getBoundingClientRect();
+
+                // Save context for rotation
+                ctx.save();
+
+                // Move to the center of where the polaroid should be
+                const polaroidCenterX = rect.left + rect.width / 2;
+                const polaroidCenterY = rect.top + rect.height / 2;
+                ctx.translate(polaroidCenterX, polaroidCenterY);
+
+                // Apply the -3 degree rotation (matching the CSS animation)
+                ctx.rotate(-3 * Math.PI / 180);
+
+                // Draw from the top-left corner (offset by半 width/height since we're at center)
+                const drawX = -rect.width / 2;
+                const drawY = -rect.height / 2;
+
                 // Fill white background (polaroid frame)
                 ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, rect.width, rect.height);
+                ctx.fillRect(drawX, drawY, rect.width, rect.height);
 
                 // Draw the polaroid image
                 const polaroidImg = document.getElementById('polaroid_image');
@@ -1623,22 +1646,28 @@
                     const imgWidth = rect.width - (imgPadding * 2);
                     const imgHeight = (polaroidImg.naturalHeight / polaroidImg.naturalWidth) * imgWidth;
 
-                    ctx.drawImage(polaroidImg, imgPadding, imgPadding, imgWidth, imgHeight);
+                    ctx.drawImage(
+                        polaroidImg,
+                        drawX + imgPadding,
+                        drawY + imgPadding,
+                        imgWidth,
+                        imgHeight
+                    );
                 }
 
                 // Draw the text
                 const polaroidText = document.getElementById('polaroid_text');
                 if (polaroidText) {
-                    const text = polaroidText.innerHTML.replace(/<[^>]*>/g, ''); // Strip HTML for now
-
                     ctx.save();
                     ctx.font = '28px "Covered By Your Grace", cursive';
                     ctx.fillStyle = '#222222';
                     ctx.textAlign = 'center';
                     ctx.globalAlpha = 0.85;
 
-                    // Apply the transform (rotation and skew)
-                    ctx.translate(rect.width / 2, rect.height - 25);
+                    // Position text at bottom of polaroid
+                    ctx.translate(0, drawY + rect.height - 25);
+
+                    // Apply text rotation and skew (relative to already rotated polaroid)
                     ctx.rotate(-2 * Math.PI / 180);
                     ctx.transform(1, 0, -0.035, 1, 0, 0); // skewX
 
@@ -1669,6 +1698,8 @@
 
                     ctx.restore();
                 }
+
+                ctx.restore();
 
                 // Convert canvas to blob
                 return new Promise((resolve) => {
