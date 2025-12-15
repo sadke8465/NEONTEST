@@ -1621,14 +1621,25 @@
                 if (polaroidImg && polaroidImg.complete) {
                     const imgPadding = 15; // Match CSS padding
                     const imgWidth = rect.width - (imgPadding * 2);
-                    const imgHeight = (polaroidImg.naturalHeight / polaroidImg.naturalWidth) * imgWidth;
+
+                    // Crop 10% from the bottom of the image to make room for text
+                    const cropRatio = 0.9; // Use 90% of the image height
+                    const fullImgHeight = (polaroidImg.naturalHeight / polaroidImg.naturalWidth) * imgWidth;
+                    const croppedImgHeight = fullImgHeight * cropRatio;
+
+                    // Draw cropped image (crop from bottom by adjusting source rectangle)
+                    const sourceHeight = polaroidImg.naturalHeight * cropRatio;
 
                     ctx.drawImage(
                         polaroidImg,
-                        imgPadding,
-                        imgPadding,
-                        imgWidth,
-                        imgHeight
+                        0, // source x
+                        0, // source y
+                        polaroidImg.naturalWidth, // source width
+                        sourceHeight, // source height (cropped)
+                        imgPadding, // dest x
+                        imgPadding, // dest y
+                        imgWidth, // dest width
+                        croppedImgHeight // dest height
                     );
                 }
 
