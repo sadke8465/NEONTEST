@@ -1664,8 +1664,9 @@
                     ctx.textAlign = 'center';
                     ctx.globalAlpha = 0.85;
 
-                    // Position text at bottom of polaroid
-                    ctx.translate(0, drawY + rect.height - 25);
+                    // Position text at bottom of polaroid (adjusted to prevent clipping)
+                    // CSS uses bottom: 25px, but canvas fillText uses baseline, so we need more space
+                    ctx.translate(0, drawY + rect.height - 40);
 
                     // Apply text rotation and skew (relative to already rotated polaroid)
                     ctx.rotate(-2 * Math.PI / 180);
