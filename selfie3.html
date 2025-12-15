@@ -1676,21 +1676,29 @@
                     const dieselMatch = textContent.match(/^DIESEL/);
 
                     if (dieselMatch) {
-                        // Measure text to position it correctly
-                        const fullText = textContent;
-                        const fullWidth = ctx.measureText(fullText).width;
-                        const dieselWidth = ctx.measureText('DIESEL').width;
-                        const restText = textContent.substring(6); // Everything after "DIESEL"
+                        // Split the text into parts
+                        const parts = textContent.match(/^(DIESEL)(.*)$/);
+                        if (parts) {
+                            const dieselPart = parts[1];
+                            const restPart = parts[2];
 
-                        const startX = -fullWidth / 2;
+                            // Measure the full text to center it properly
+                            const fullWidth = ctx.measureText(textContent).width;
+                            const dieselWidth = ctx.measureText(dieselPart).width;
 
-                        // Draw "DIESEL" in red
-                        ctx.fillStyle = '#ff0000';
-                        ctx.fillText('DIESEL', startX + dieselWidth / 2, 0);
+                            // Start position (left-aligned from center)
+                            const startX = -fullWidth / 2;
 
-                        // Draw the rest in black
-                        ctx.fillStyle = '#222222';
-                        ctx.fillText(restText, startX + dieselWidth + ctx.measureText(restText).width / 2, 0);
+                            // Draw "DIESEL" in red
+                            ctx.fillStyle = '#ff0000';
+                            ctx.fillText(dieselPart, startX + dieselWidth / 2, 0);
+
+                            // Draw the rest in black
+                            ctx.fillStyle = '#222222';
+                            const restStartX = startX + dieselWidth;
+                            const restWidth = ctx.measureText(restPart).width;
+                            ctx.fillText(restPart, restStartX + restWidth / 2, 0);
+                        }
                     } else {
                         // Draw the whole text normally
                         ctx.fillText(textContent, 0, 0);
