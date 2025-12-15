@@ -560,7 +560,7 @@
         <!-- Tooltip -->
         <div id="tooltip_container">
             <button id="tooltip_close" aria-label="Close">×</button>
-            <p id="tooltip_text">תזיזו, תסובבו ותגדילו את המודל כדי לקבל את התמונה המושלמת!</p>
+            <p id="tooltip_text">תזיזו ותגדילו את המודל כדי לקבל את התמונה המושלמת!</p>
         </div>
     </div>
     <video class="input_video" playsinline muted></video>
@@ -595,21 +595,17 @@
         let objectModelBaseScale = 1.0; // Store the initial base scale
         let objectModelTransform = {
             position: { x: 0, y: 0, z: 0 },
-            scale: 1.0,
-            rotation: 0 // Y-axis rotation in radians
+            scale: 1.0
         };
 
         // Interaction state for object model
         let interactionState = {
             isDragging: false,
             isScaling: false,
-            isRotating: false,
             startTouch: null,
             lastTouch: null,
             initialDistance: 0,
-            initialScale: 1.0,
-            initialRotation: 0,
-            initialAngle: 0
+            initialScale: 1.0
         };
 
         // Animation state for model switching
@@ -1360,7 +1356,6 @@
                 );
                 const finalScale = objectModelBaseScale * objectModelTransform.scale;
                 objectModel.scale.set(finalScale, finalScale, finalScale);
-                objectModel.rotation.y = objectModelTransform.rotation;
             }
 
             // Enable bloom pass when switching to neon (so it can fade in)
@@ -1434,18 +1429,13 @@
                 interactionState.startTouch = worldPos;
                 interactionState.lastTouch = worldPos;
             } else if (e.touches.length === 2) {
-                // Two fingers - scale and rotate
+                // Two fingers - scale
                 interactionState.isDragging = false;
                 interactionState.isScaling = true;
-                interactionState.isRotating = true;
 
                 const distance = getTouchDistance(e.touches[0], e.touches[1]);
                 interactionState.initialDistance = distance;
                 interactionState.initialScale = objectModelTransform.scale;
-
-                const angle = getTouchAngle(e.touches[0], e.touches[1]);
-                interactionState.initialAngle = angle;
-                interactionState.initialRotation = objectModelTransform.rotation;
             }
         }, { passive: false });
 
@@ -1482,20 +1472,6 @@
                 // Apply scale using stored base scale
                 const finalScale = objectModelBaseScale * newScale;
                 objectModel.scale.set(finalScale, finalScale, finalScale);
-
-                // Rotate object
-                if (interactionState.isRotating) {
-                    const angle = getTouchAngle(e.touches[0], e.touches[1]);
-                    const angleDelta = angle - interactionState.initialAngle;
-                    let newRotation = interactionState.initialRotation + angleDelta;
-
-                    // Clamp rotation to ±30 degrees (±0.524 radians)
-                    const maxRotation = THREE.MathUtils.degToRad(50);
-                    newRotation = Math.max(-maxRotation, Math.min(maxRotation, newRotation));
-                    objectModelTransform.rotation = newRotation;
-
-                    objectModel.rotation.y = newRotation;
-                }
             }
         }, { passive: false });
 
@@ -1504,7 +1480,6 @@
 
             interactionState.isDragging = false;
             interactionState.isScaling = false;
-            interactionState.isRotating = false;
         });
 
         // Mouse event handlers (for desktop)
@@ -1619,6 +1594,96 @@
             URL.revokeObjectURL(url);
         }
 
+        async function capturePolaroidAsImage() {
+            try {
+                // Get the polaroid container element
+                const polaroid = document.getElementById('polaroid_container');
+                if (!polaroid) return null;
+
+                // Get the computed bounds
+                const rect = polaroid.getBoundingClientRect();
+
+                // Create a canvas with the same dimensions as the polaroid
+                const canvas = document.createElement('canvas');
+                const scale = window.devicePixelRatio || 1;
+                canvas.width = rect.width * scale;
+                canvas.height = rect.height * scale;
+
+                const ctx = canvas.getContext('2d');
+                ctx.scale(scale, scale);
+
+                // Fill white background (polaroid frame)
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, rect.width, rect.height);
+
+                // Draw the polaroid image
+                const polaroidImg = document.getElementById('polaroid_image');
+                if (polaroidImg && polaroidImg.complete) {
+                    const imgPadding = 15; // Match CSS padding
+                    const imgWidth = rect.width - (imgPadding * 2);
+                    const imgHeight = (polaroidImg.naturalHeight / polaroidImg.naturalWidth) * imgWidth;
+
+                    ctx.drawImage(polaroidImg, imgPadding, imgPadding, imgWidth, imgHeight);
+                }
+
+                // Draw the text
+                const polaroidText = document.getElementById('polaroid_text');
+                if (polaroidText) {
+                    const text = polaroidText.innerHTML.replace(/<[^>]*>/g, ''); // Strip HTML for now
+
+                    ctx.save();
+                    ctx.font = '28px "Covered By Your Grace", cursive';
+                    ctx.fillStyle = '#222222';
+                    ctx.textAlign = 'center';
+                    ctx.globalAlpha = 0.85;
+
+                    // Apply the transform (rotation and skew)
+                    ctx.translate(rect.width / 2, rect.height - 25);
+                    ctx.rotate(-2 * Math.PI / 180);
+                    ctx.transform(1, 0, -0.035, 1, 0, 0); // skewX
+
+                    // Handle the colored "DIESEL" text
+                    const textContent = polaroidText.textContent;
+                    const dieselMatch = textContent.match(/^DIESEL/);
+
+                    if (dieselMatch) {
+                        // Measure text to position it correctly
+                        const fullText = textContent;
+                        const fullWidth = ctx.measureText(fullText).width;
+                        const dieselWidth = ctx.measureText('DIESEL').width;
+                        const restText = textContent.substring(6); // Everything after "DIESEL"
+
+                        const startX = -fullWidth / 2;
+
+                        // Draw "DIESEL" in red
+                        ctx.fillStyle = '#ff0000';
+                        ctx.fillText('DIESEL', startX + dieselWidth / 2, 0);
+
+                        // Draw the rest in black
+                        ctx.fillStyle = '#222222';
+                        ctx.fillText(restText, startX + dieselWidth + ctx.measureText(restText).width / 2, 0);
+                    } else {
+                        // Draw the whole text normally
+                        ctx.fillText(textContent, 0, 0);
+                    }
+
+                    ctx.restore();
+                }
+
+                // Convert canvas to blob
+                return new Promise((resolve) => {
+                    canvas.toBlob((blob) => {
+                        resolve(blob);
+                    }, 'image/png');
+                });
+
+            } catch (error) {
+                console.error('Error capturing polaroid:', error);
+                return null;
+            }
+        }
+
+
         // Camera Switch Logic
         const arSwitchBtn = document.getElementById('ar_switch_btn');
 
@@ -1670,14 +1735,22 @@
             currentPhotoBlob = null;
         });
 
-        pbShareBtn.addEventListener('click', () => {
+        pbShareBtn.addEventListener('click', async () => {
             if (currentPhotoBlob) {
                 const now = new Date();
                 const d = String(now.getDate()).padStart(2, '0');
                 const m = String(now.getMonth() + 1).padStart(2, '0');
                 const y = String(now.getFullYear()).slice(-2);
                 const filename = `Diesel Selfie ${d}.${m}.${y}.png`;
-                shareMedia(currentPhotoBlob, filename);
+
+                // Capture the polaroid container (with frame and text)
+                const polaroidBlob = await capturePolaroidAsImage();
+                if (polaroidBlob) {
+                    shareMedia(polaroidBlob, filename);
+                } else {
+                    // Fallback to original image if capture fails
+                    shareMedia(currentPhotoBlob, filename);
+                }
             }
         });
 
